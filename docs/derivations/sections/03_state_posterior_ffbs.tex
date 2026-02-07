@@ -23,6 +23,8 @@ f_{t,n} &= \bm h_{t,n}^\T \bm R_{t,n-1}\bm h_{t,n}+r_{t,n}, \label{eq:kf_f}\\
 \end{align}
 Initialization at time $t$: $\bm m_{t,0}=\bm a_t$, $\bm C_{t,0}=\bm R_t$.
 Set filtered moments $\bm m_t=\bm m_{t,n_t}$, $\bm C_t=\bm C_{t,n_t}$.
+Thus, the second index $n$ denotes within-time assimilation stage, while
+$(\bm m_t,\bm C_t)$ denote post-assimilation filtered moments at time $t$.
 
 \subsection{FFBS Simulation Smoother}
 Backward simulation starts at $\bm x_T\sim\N(\bm m_T,\bm C_T)$.
