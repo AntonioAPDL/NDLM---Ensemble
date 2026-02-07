@@ -1,0 +1,30 @@
+\section{Computational Notes and Validation Checklist}
+
+\subsection{Observation Interface}
+Implement all models through one observation-list API using tuples
+$(t,n,y_{t,n},\bm h_{t,n},r_{t,n},\text{source}(n))$.
+This enforces a unique mapping from each observation to its variance parameter
+$\sigma_j^2$.
+
+\subsection{Numerical Stability Rules}
+\begin{itemize}
+\item Use Cholesky solves, never explicit matrix inversion.
+\item Symmetrize covariance updates: replace $\bm C\leftarrow(\bm C+\bm C^\T)/2$ after updates.
+\item Floor scalar variances at a positive tolerance in implementations.
+\end{itemize}
+
+\subsection{Reduction Checks}
+The derivations must reduce to known special cases:
+\begin{itemize}
+\item $J=0$ and no transfer term: standard Gaussian DLM.
+\item $\bm\delta_t^j\equiv 0$: retrospective means collapse to baseline mean.
+\item No forecast window ($K=0$): Model C terms vanish.
+\end{itemize}
+
+\subsection{Required Unit-Level Validations}
+\begin{itemize}
+\item Gaussian likelihood normalizes to one for each source.
+\item IG and IW conditional kernels match conjugate updates.
+\item Kalman/FFBS moments match brute-force Gaussian conditioning on toy systems.
+\item Analytic derivatives for the $\lambda$ block match finite differences.
+\end{itemize}

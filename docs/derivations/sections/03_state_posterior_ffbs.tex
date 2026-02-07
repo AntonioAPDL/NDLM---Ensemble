@@ -1,0 +1,39 @@
+\section{Conditional State Posterior: Kalman Filter and FFBS}
+
+\subsection{Unified Linear-Gaussian Form}
+Conditioning on static parameters, each model block reduces to
+\begin{align}
+\bm x_t\given\bm x_{t-1} &\sim \N(\bm G_t\bm x_{t-1},\bm Q_t), \label{eq:lgssm_state}\\
+y_{t,n}\given\bm x_t &\sim \N(\bm h_{t,n}^\T\bm x_t,r_{t,n}),\quad n=1,\dots,n_t. \label{eq:lgssm_obs}
+\end{align}
+Here $\bm x_t$ is whichever stacked state is active ($\bm\alpha_t$, $\bm\beta_t$, or block-stacked variants).
+
+\subsection{Sequential Kalman Assimilation at Fixed Time}
+Prediction:
+\begin{align}
+\bm a_t &= \bm G_t\bm m_{t-1},
+& \bm R_t &= \bm G_t\bm C_{t-1}\bm G_t^\T + \bm Q_t.
+\end{align}
+For each scalar observation $(y_{t,n},\bm h_{t,n},r_{t,n})$:
+\begin{align}
+f_{t,n} &= \bm h_{t,n}^\T \bm R_{t,n-1}\bm h_{t,n}+r_{t,n}, \label{eq:kf_f}\\
+\bm K_{t,n} &= \bm R_{t,n-1}\bm h_{t,n} f_{t,n}^{-1}, \label{eq:kf_K}\\
+\bm m_{t,n} &= \bm m_{t,n-1}+\bm K_{t,n}(y_{t,n}-\bm h_{t,n}^\T\bm m_{t,n-1}), \label{eq:kf_m}\\
+\bm C_{t,n} &= \bm C_{t,n-1}-\bm K_{t,n}\bm h_{t,n}^\T\bm C_{t,n-1}. \label{eq:kf_C}
+\end{align}
+Initialization at time $t$: $\bm m_{t,0}=\bm a_t$, $\bm C_{t,0}=\bm R_t$.
+Set filtered moments $\bm m_t=\bm m_{t,n_t}$, $\bm C_t=\bm C_{t,n_t}$.
+
+\subsection{FFBS Simulation Smoother}
+Backward simulation starts at $\bm x_T\sim\N(\bm m_T,\bm C_T)$.
+For $t=T-1,\dots,0$,
+\begin{align}
+\bm B_t &= \bm C_t\bm G_{t+1}^\T\bm R_{t+1}^{-1}, \label{eq:ffbs_B}\\
+\bm h_t &= \bm m_t + \bm B_t(\bm x_{t+1}-\bm a_{t+1}), \label{eq:ffbs_h}\\
+\bm H_t &= \bm C_t - \bm B_t\bm R_{t+1}\bm B_t^\T, \label{eq:ffbs_H}\\
+\bm x_t\given\bm x_{t+1},\text{data},\Theta &\sim \N(\bm h_t,\bm H_t). \label{eq:ffbs_cond}
+\end{align}
+
+\subsection{Computability Constraints}
+All updates use Cholesky solves of $f_{t,n}$ (scalar) or small SPD matrices.
+No inversion of large $n_t\times n_t$ matrices is required when observations are assimilated sequentially.

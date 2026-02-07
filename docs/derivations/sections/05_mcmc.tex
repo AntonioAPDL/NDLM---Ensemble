@@ -1,0 +1,29 @@
+\section{Blocked MCMC Algorithm}
+
+One Gibbs/MH sweep for the Gaussian NDLM proceeds as follows.
+
+\begin{enumerate}[label=\textbf{Step \arabic*:},leftmargin=2.8cm]
+\item Sample state trajectories using FFBS:
+\begin{align*}
+\bm x_{0:T}^{(s)} \sim p(\bm x_{0:T}\given\text{data},\Theta^{(s-1)}),
+\end{align*}
+with block choice either joint stacked state or conditional blocks.
+
+\item Update observation variances for each source $j$ using \eqref{eq:cond_sigma}.
+
+\item Update evolution covariance blocks $\bm W_b$ using \eqref{eq:cond_W}
+(or skip when discount factors fix these covariances).
+
+\item Update $\lambda$ via \eqref{eq:cond_lambda} (or a truncated Normal draw when $|\lambda|<1$ is enforced).
+
+\item Forecast-period smoothing/sampling (if Model C active):
+run FFBS on $\bm\beta_{T:T+K}$ conditional on sampled static parameters.
+\end{enumerate}
+
+\subsection{Diagnostics Required for Correctness}
+Track and report:
+\begin{itemize}
+\item Effective sample size and trace stability for each $\sigma_j^2$ and $\lambda$.
+\item Innovation quadratic forms $\bm e_t^\T\bm W_b^{-1}\bm e_t$.
+\item Posterior predictive calibration at historical holdout points.
+\end{itemize}

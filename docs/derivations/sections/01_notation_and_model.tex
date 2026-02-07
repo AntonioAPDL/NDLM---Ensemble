@@ -1,0 +1,88 @@
+\section{Notation and Model Specification}
+
+\subsection{Indexing, Support, and Dimensions}
+Historical period is $t=1,\dots,T$ and forecast period is $t=T+1,\dots,T+K$.
+For $j=1,\dots,J$, $z_t^j\in\R$ denotes retrospective products;
+$y_t^0\in\R$ denotes the target series.
+
+Core states and dimensions:
+\begin{align}
+\bm\theta_t &\in \R^q, & \bm\delta_t^j &\in \R^q, & \bm\psi_t &\in \R^m, & \zeta_t &\in \R.
+\end{align}
+Stacked historical and forecast states are
+\begin{align}
+\bm\alpha_t &= (\bm\theta_t^\T,\zeta_t,\bm\psi_t^\T)^\T \in \R^{q+1+m}, \\
+\bm\beta_t &= (\bm\theta_t^\T,(\bm\delta_t^1)^\T,\dots,(\bm\delta_t^{J_f})^\T)^\T \in \R^{q(1+J_f)}.
+\end{align}
+
+Observation variances satisfy $\sigma_j^2>0$ for all $j=0,\dots,J$.
+
+\subsection{Model A: Baseline Historical Gaussian NDLM}
+For $t=1,\dots,T$,
+\begin{align}
+ y_t^0 \given \bm\alpha_t,\sigma_0^2
+ &\sim \N(\tilde{\bm F}_t^\T \bm\alpha_t,\sigma_0^2), \label{eq:A_obs}\\
+ \bm\theta_t \given \bm\theta_{t-1}
+ &\sim \N(\bm G_t\bm\theta_{t-1},\bm W_t^\theta), \label{eq:A_theta}\\
+ \zeta_t \given \zeta_{t-1},\bm\psi_t
+ &\sim \N(\lambda\zeta_{t-1}+\bm x_t^\T\bm\psi_t,w_t^\zeta), \label{eq:A_zeta}\\
+ \bm\psi_t \given \bm\psi_{t-1}
+ &\sim \N(\bm\psi_{t-1},\bm W_t^\psi). \label{eq:A_psi}
+\end{align}
+
+With
+\begin{align}
+\tilde{\bm F}_t &= [\bm F_t^\T\;1\;\bm 0_m^\T]^\T, \\
+\tilde{\bm G}_t &=
+\begin{bmatrix}
+\bm G_t & 0 & 0 \\
+0 & \lambda & \bm x_t^\T \\
+0 & 0 & \bm I_m
+\end{bmatrix},
+&
+\tilde{\bm W}_t &= \BlockDiag(\bm W_t^\theta,w_t^\zeta,\bm W_t^\psi),
+\end{align}
+we have $\bm\alpha_t\given\bm\alpha_{t-1}\sim\N(\tilde{\bm G}_t\bm\alpha_{t-1},\tilde{\bm W}_t)$.
+
+\subsection{Model B: Historical Retrospective Products with Discrepancies}
+For $t=1,\dots,T$ and $j=1,\dots,J$,
+\begin{align}
+z_t^j \given \bm\alpha_t,\bm\delta_t^j,\sigma_j^2
+&\sim \N(\tilde{\bm F}_t^\T\bm\alpha_t+\bm F_t^\T\bm\delta_t^j,\sigma_j^2), \label{eq:B_obs}\\
+\bm\delta_t^j\given\bm\delta_{t-1}^j
+&\sim \N(\bm G_t\bm\delta_{t-1}^j,\bm W_t^{\delta^j}). \label{eq:B_delta}
+\end{align}
+
+\subsection{Model C: Forecast Ensemble Likelihood (Gaussian)}
+For active forecasters $j=1,\dots,J_f$, members $i=1,\dots,I_j$, leads $k=1,\dots,K$,
+\begin{align}
+ y_T^{j,i}(k) \given \bm\beta_{T+k},\sigma_j^2
+ &\sim \N(\bm e_{T+k,j+1}^\T\bm\beta_{T+k},\sigma_j^2), \label{eq:C_obs}\\
+ \bm\beta_t\given\bm\beta_{t-1}
+ &\sim \N(\bm M_t\bm\beta_{t-1},\bm W_t^\beta). \label{eq:C_state}
+\end{align}
+
+\subsection{Observation List Representation (Computable Form)}
+At each time $t$, index scalar observations by $n=1,\dots,n_t$:
+\begin{align}
+y_{t,n} \given \bm x_t &\sim \N(\bm h_{t,n}^\T\bm x_t,r_{t,n}), \label{eq:obs_list}
+\end{align}
+with $(\bm x_t,\bm h_{t,n},r_{t,n})=(\bm\alpha_t,\tilde{\bm F}_t,\sigma_0^2)$ for target,
+$(\bm\alpha_t\oplus\bm\delta_t^j,\tilde{\bm h}_{t,n},\sigma_j^2)$ for retrospective products,
+and $(\bm\beta_t,\bm e_{t,j+1},\sigma_j^2)$ for forecast members.
+
+\subsection{Prior Block}
+Default priors (conjugate where available):
+\begin{align}
+\sigma_j^2 &\sim \IG(a_{\sigma j},b_{\sigma j}),\qquad j=0,\dots,J, \label{eq:prior_sigma}\\
+\bm W_b &\sim \IW(\nu_b,\bm S_b),\qquad b\in\{\theta,\psi,\delta^1,\dots,\delta^J,\beta\}, \label{eq:prior_W}\\
+\lambda &\sim \N(m_{\lambda0},C_{\lambda0})\;\text{or}\;\N(m_{\lambda0},C_{\lambda0})\ind(|\lambda|<1). \label{eq:prior_lambda}
+\end{align}
+Initial states are Gaussian with fixed hyperparameters:
+\begin{align}
+\bm\alpha_0\sim\N(\bm m_{\alpha0},\bm C_{\alpha0}),
+\qquad
+\bm\delta_0^j\sim\N(\bm m_{\delta0}^j,\bm C_{\delta0}^j),
+\qquad
+\bm\beta_T\sim\N(\bm m_{\beta T},\bm C_{\beta T}).
+\end{align}

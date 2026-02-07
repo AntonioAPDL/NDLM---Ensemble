@@ -1,0 +1,41 @@
+\section{Sufficient-Statistic Assimilation for Replicated Observations}
+
+\subsection{Replicate Aggregation}
+Suppose at time $t$ and source $j$ there are replicates
+$y_{t,1}^{(j)},\dots,y_{t,I_j}^{(j)}$ sharing mean $\mu_t^{(j)}$ and variance $\sigma_j^2$:
+\begin{align}
+y_{t,i}^{(j)}\given\mu_t^{(j)},\sigma_j^2\iid \N(\mu_t^{(j)},\sigma_j^2).
+\end{align}
+The sample mean $\bar y_t^{(j)}=I_j^{-1}\sum_i y_{t,i}^{(j)}$ is sufficient for $\mu_t^{(j)}$,
+with equivalent single-observation likelihood
+\begin{align}
+\bar y_t^{(j)}\given\mu_t^{(j)},\sigma_j^2
+\sim \N\left(\mu_t^{(j)},\frac{\sigma_j^2}{I_j}\right).
+\label{eq:replicate_sufficient}
+\end{align}
+
+\subsection{Kalman Update with Aggregated Observation}
+In sequential assimilation, use
+$r_{t,n}=\sigma_j^2/I_j$ and $y_{t,n}=\bar y_t^{(j)}$ for the corresponding channel.
+This is algebraically equivalent to assimilating all replicates one by one.
+
+\subsection{Variance Update with Between/Within Decomposition}
+Let
+\begin{align}
+\mathrm{SSE}_{t}^{(j)}
+&= \sum_{i=1}^{I_j}\left(y_{t,i}^{(j)}-\mu_t^{(j)}\right)^2 \\
+&= \sum_{i=1}^{I_j}\left(y_{t,i}^{(j)}-\bar y_t^{(j)}\right)^2
++ I_j\left(\bar y_t^{(j)}-\mu_t^{(j)}\right)^2.
+\label{eq:sse_decomposition}
+\end{align}
+Equation \eqref{eq:sse_decomposition} enables streaming IG updates while retaining exactness.
+
+\subsection{Forecast Synthesis for Target}
+At forecast time $t=T+k$, define synthesized target signal as
+\begin{align}
+\mu_t^{0,\mathrm{syn}} = \bm f_t^{0\T}\bm\theta_t
+\quad\text{or}\quad
+\mu_t^{0,\mathrm{syn}} = \tilde{\bm f}_t^{0\T}\bm\alpha_t,
+\end{align}
+according to whether transfer terms are propagated into the forecast phase.
+Posterior summaries follow directly from MCMC draws or VB moments.

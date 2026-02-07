@@ -1,0 +1,34 @@
+\section{Posterior Predictive Distributions}
+
+\subsection{Conditional Predictive at Fixed State}
+For observation channel $j$ with design $\bm h_t$,
+\begin{align}
+y_t^{(j)}\given\bm x_t,\sigma_j^2 \sim \N(\bm h_t^\T\bm x_t,\sigma_j^2).
+\end{align}
+
+\subsection{One-Step Predictive from Filtering}
+If $\bm x_t\given\mathcal{D}_{1:t-1}\sim\N(\bm a_t,\bm R_t)$, then
+\begin{align}
+y_t^{(j)}\given\mathcal{D}_{1:t-1}
+\sim \N\left(\bm h_t^\T\bm a_t,\;\bm h_t^\T\bm R_t\bm h_t+\sigma_j^2\right).
+\label{eq:one_step_pred}
+\end{align}
+
+\subsection{MCMC Posterior Predictive}
+Given samples $\{\bm x_t^{(s)},\sigma_j^{2,(s)}\}_{s=1}^S$,
+\begin{align}
+p(y_t^{(j)}\given\mathcal{D})
+\approx \frac{1}{S}\sum_{s=1}^S
+\N\left(y_t^{(j)};\bm h_t^\T\bm x_t^{(s)},\sigma_j^{2,(s)}\right).
+\label{eq:mcmc_ppd}
+\end{align}
+
+\subsection{VB Moment-Matched Predictive}
+Using $q(\bm x_t)=\N(\bm m_t,\bm C_t)$ and
+$q(\sigma_j^2)=\IG(\tilde a_j,\tilde b_j)$,
+\begin{align}
+\E_q[y_t^{(j)}] &= \bm h_t^\T\bm m_t, \\
+\Var_q(y_t^{(j)})
+&= \bm h_t^\T\bm C_t\bm h_t + \E_q[\sigma_j^2],
+\end{align}
+with $\E_q[\sigma_j^2]=\tilde b_j/(\tilde a_j-1)$ for $\tilde a_j>1$.

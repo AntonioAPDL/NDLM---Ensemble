@@ -1,0 +1,45 @@
+\section{Full Joint Density and Posterior Factorization}
+
+\subsection{Model A Joint}
+Define $\Theta_A=(\sigma_0^2,\lambda,\bm W^\theta,\bm W^\psi,w^\zeta)$.
+The complete joint for historical target-only data is
+\begin{align}
+p(\bm y_{1:T}^0,\bm\alpha_{0:T},\Theta_A)
+&= p(\bm\alpha_0)\,p(\Theta_A)
+\prod_{t=1}^T p(\bm\alpha_t\given\bm\alpha_{t-1},\Theta_A)
+\prod_{t=1}^T p(y_t^0\given\bm\alpha_t,\sigma_0^2).\label{eq:joint_A}
+\end{align}
+
+\subsection{Model B Joint}
+Define $\Theta_B=\Theta_A\cup\{\sigma_1^2,\dots,\sigma_J^2,\bm W^{\delta^1},\dots,\bm W^{\delta^J}\}$.
+Then
+\begin{align}
+&p(\bm y_{1:T}^0,\bm z_{1:T}^{1:J},\bm\alpha_{0:T},\bm\delta_{0:T}^{1:J},\Theta_B) \\
+&= p(\bm\alpha_0)\prod_{j=1}^J p(\bm\delta_0^j)\,p(\Theta_B)
+\prod_{t=1}^T p(\bm\alpha_t\given\bm\alpha_{t-1},\Theta_B)
+\prod_{t=1}^T p(y_t^0\given\bm\alpha_t,\sigma_0^2)
+\prod_{j=1}^J\prod_{t=1}^T p(\bm\delta_t^j\given\bm\delta_{t-1}^j,\bm W_t^{\delta^j}) \\
+&\hspace{3em}\times
+\prod_{j=1}^J\prod_{t=1}^T p(z_t^j\given\bm\alpha_t,\bm\delta_t^j,\sigma_j^2).\label{eq:joint_B}
+\end{align}
+
+\subsection{Model C Joint}
+Let $\Theta_C=(\sigma_1^2,\dots,\sigma_{J_f}^2,\bm W^\beta,\text{forecast hyperparameters})$.
+For forecast observations $\mathcal{Y}_{T+1:T+K}$,
+\begin{align}
+p(\mathcal{Y}_{T+1:T+K},\bm\beta_{T:T+K},\Theta_C)
+&= p(\bm\beta_T)\,p(\Theta_C)
+\prod_{t=T+1}^{T+K} p(\bm\beta_t\given\bm\beta_{t-1},\Theta_C)
+\prod_{t=T+1}^{T+K}\prod_{n=1}^{n_t} p(y_{t,n}\given\bm\beta_t,\Theta_C).
+\label{eq:joint_C}
+\end{align}
+
+\subsection{Posterior Kernel}
+The posterior for any model block $\mathcal{M}\in\{A,B,C\}$ is
+\begin{align}
+p(\text{states},\Theta\given\text{data})\propto
+p(\text{data},\text{states},\Theta),
+\label{eq:posterior_kernel}
+\end{align}
+with the explicit factorization given by \eqref{eq:joint_A}--\eqref{eq:joint_C}.
+These product forms are the basis for Gibbs blocks and CAVI factors.

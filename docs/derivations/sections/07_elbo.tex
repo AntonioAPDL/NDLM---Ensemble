@@ -1,0 +1,52 @@
+\section{ELBO Decomposition}
+
+\subsection{Definition}
+\begin{align}
+\ELBO(q)
+&:= \E_q[\log p(\text{data},\text{states},\sigma^2,W,\lambda)]
+-\E_q[\log q(\text{states},\sigma^2,W,\lambda)].
+\label{eq:elbo_def}
+\end{align}
+
+\subsection{Additive Blocks}
+\begin{align}
+\ELBO(q)
+&= \mathcal{L}_{\text{like}}
++\mathcal{L}_{\text{trans}}
++\mathcal{L}_{\text{init}}
++\mathcal{L}_{\text{priors}}
++\mathcal{H}_{\text{states}}
++\sum_j\mathcal{H}_{\sigma_j^2}
++\sum_b\mathcal{H}_{W_b}
++\mathcal{H}_{\lambda}.
+\label{eq:elbo_blocks}
+\end{align}
+
+Likelihood block with scalar Gaussian observations:
+\begin{align}
+\mathcal{L}_{\text{like}}
+= -\frac12\sum_{j=0}^{J}\left(
+N_j\log(2\pi)
++N_j\E_q[\log \sigma_j^2]
++\E_q[\sigma_j^{-2}]\E_q[\mathrm{SSE}_j]
+\right).
+\label{eq:elbo_like}
+\end{align}
+
+Transition block for each covariance block $b$:
+\begin{align}
+\mathcal{L}_{\text{trans},b}
+= -\frac12\left(
+T_bd_b\log(2\pi)
++T_b\E_q[\log|\bm W_b|]
++\sum_{t=1}^{T_b}\tr\left(\E_q[\bm W_b^{-1}]\E_q[\bm e_t\bm e_t^\T]\right)
+\right).
+\label{eq:elbo_trans_block}
+\end{align}
+
+\subsection{Convergence Criterion}
+Stop CAVI when
+\begin{align}
+\frac{|\ELBO^{(r)}-\ELBO^{(r-1)}|}{1+|\ELBO^{(r-1)}|}<\varepsilon_{\text{elbo}}.
+\label{eq:elbo_stop}
+\end{align}

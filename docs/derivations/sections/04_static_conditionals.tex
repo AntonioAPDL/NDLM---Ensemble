@@ -1,0 +1,46 @@
+\section{Full Conditionals for Static Parameters}
+
+\subsection{Observation Variances: Inverse-Gamma}
+For each source $j\in\{0,\dots,J\}$, let $\mathcal{I}_j$ index all observations driven by $\sigma_j^2$,
+and define residuals
+\begin{align}
+r_n^{(j)} := y_n^{(j)}-\mu_n^{(j)}, \qquad \mathrm{SSE}_j := \sum_{n\in\mathcal{I}_j} \left(r_n^{(j)}\right)^2,
+\qquad N_j:=|\mathcal{I}_j|.
+\end{align}
+Under $\sigma_j^2\sim\IG(a_{\sigma j},b_{\sigma j})$,
+\begin{align}
+\sigma_j^2\given\text{rest}
+\sim \IG\left(a_{\sigma j}+\frac{N_j}{2},\; b_{\sigma j}+\frac{1}{2}\mathrm{SSE}_j\right).
+\label{eq:cond_sigma}
+\end{align}
+
+\subsection{Evolution Covariances: Inverse-Wishart}
+For any Gaussian transition block with innovations
+$\bm e_t=\bm x_t-\bm G\bm x_{t-1}\in\R^{d_b}$ and prior
+$\bm W_b\sim\IW(\nu_b,\bm S_b)$,
+\begin{align}
+\bm W_b\given\text{rest}
+\sim\IW\left(\nu_b+T_b,\;\bm S_b+\sum_{t=1}^{T_b}\bm e_t\bm e_t^\T\right),
+\label{eq:cond_W}
+\end{align}
+where $T_b$ is the number of transitions included in block $b$.
+
+\subsection{Transfer Coefficient: Conjugate Gaussian Update}
+From
+\begin{align}
+\zeta_t &= \lambda\zeta_{t-1}+\bm x_t^\T\bm\psi_t+\varepsilon_t,
+\qquad \varepsilon_t\sim\N(0,w^\zeta),
+\end{align}
+with prior $\lambda\sim\N(m_{\lambda0},C_{\lambda0})$,
+define
+\begin{align}
+y_t^\lambda := \zeta_t-\bm x_t^\T\bm\psi_t.
+\end{align}
+Then
+\begin{align}
+C_\lambda^{-1} &= C_{\lambda0}^{-1}+\frac{1}{w^\zeta}\sum_{t=1}^T \zeta_{t-1}^2,\label{eq:lambda_var}\\
+m_\lambda &= C_\lambda\left(C_{\lambda0}^{-1}m_{\lambda0}+\frac{1}{w^\zeta}\sum_{t=1}^T\zeta_{t-1}y_t^\lambda\right),\label{eq:lambda_mean}\\
+\lambda\given\text{rest} &\sim \N(m_\lambda,C_\lambda),\label{eq:cond_lambda}
+\end{align}
+and for stationarity-constrained updates use
+$\lambda\given\text{rest}\propto\N(m_\lambda,C_\lambda)\ind(|\lambda|<1)$.
