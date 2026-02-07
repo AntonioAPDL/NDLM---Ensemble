@@ -1,0 +1,2901 @@
+## Goal
+
+Produce a new document (call it, e.g., `N-DQLM___Ensemble.pdf`) that mirrors the structure of `exDQLM___Ensemble.pdf`, but with **Gaussian observation models**:
+[
+y^{j}_t \mid \mu^j_t,\sigma_j^2 \sim N(\mu^j_t,\sigma_j^2),
+\qquad j\in{0,1,\dots,J},
+]
+and **no** (p_0), no (\gamma_j), no exAL augmentation, no latent ((v,s)).
+
+Everything else (state structure, discrepancy states, forecast ensemble organization, evolution models, priors on state evolution covariances, etc.) remains the same.
+
+---
+
+## A. Front matter and global notation (must match the original style)
+
+1. **Indexing and time partitions**
+
+* Historical (training): (t=1,\dots,T)
+* Forecast period: (t=T+1,\dots,T+K) (or (K(j)) per source)
+
+2. **Series definitions**
+
+* “Truth/target”: (y^0_t) (your previous (y^o_t))
+* Retrospective products: (z_{j t}) for (j=1,\dots,J) (if you keep the same notation), or unify as (y^j_t).
+* Forecast ensemble observations: (y^{j,i}_T(k)) for model/source (j), member (i), lead (k).
+
+3. **State vectors and design vectors**
+
+* Historical baseline + transfer: (\alpha_t := (\theta_t^\top,\zeta_t,\psi_t^\top)^\top)
+* Discrepancies (\delta^j_t) (same dimension as (\theta_t))
+* Forecast stacked state: (\beta_t := (\theta_t^\top, (\delta_t^{1})^\top,\dots,(\delta_t^{J_f})^\top)^\top)
+* Define unified observation design vectors/matrices (critical for FFBS and VB):
+
+  * Historical: (\mu^0_t = \tilde F_t^\top \alpha_t)
+  * Retrospective: (\mu^j_t = \tilde F_t^\top \alpha_t + F_t^\top \delta^j_t)
+  * Forecast: (\mu^{j,i}*{T}(k)= e*{T+k,j}^\top \beta_{T+k}) (whatever selector you used before)
+
+Deliverable: a notation table with dimensions (exactly like the original).
+
+---
+
+## B. Model specification sections (mirror Model A/B/C)
+
+### B1) Model A (historical baseline + transfer function; Gaussian likelihood)
+
+4. **Observation equation**
+   [
+   y^0_t \mid \alpha_t,\sigma_0^2 \sim N(\tilde F_t^\top \alpha_t,\ \sigma_0^2).
+   ]
+
+5. **State evolution (unchanged)**
+
+* (\theta_t \mid \theta_{t-1} \sim N(G_t \theta_{t-1}, W^\theta_t))
+* (\zeta_t \mid \zeta_{t-1},\psi_t \sim N(\lambda\zeta_{t-1}+x_t^\top\psi_t,\ w^\zeta_t))
+* (\psi_t \mid \psi_{t-1} \sim N(\psi_{t-1}, W^\psi_t))
+
+6. **Stacked evolution**
+   Write (\alpha_t \mid \alpha_{t-1} \sim N(\tilde G_t \alpha_{t-1}, \tilde W_t)) with explicit block structure.
+
+### B2) Model B (add retrospective products via discrepancy states; Gaussian likelihood)
+
+7. **Retrospective observation equations**
+   [
+   z_{j t} \mid \alpha_t,\delta^j_t,\sigma_j^2 \sim N(\tilde F_t^\top \alpha_t + F_t^\top \delta^j_t,\ \sigma_j^2),
+   \quad j=1,\dots,J.
+   ]
+
+8. **Discrepancy evolutions**
+   [
+   \delta^j_t \mid \delta^j_{t-1} \sim N(G_t\delta^j_{t-1}, W^{\delta j}_t).
+   ]
+
+9. **Conditional independence graph**
+   State clearly what is independent given what (important for the factorization of the full joint and for VB).
+
+### B3) Model C (forecast ensemble period; Gaussian likelihood)
+
+10. **Forecast observation equations (many per time)**
+    [
+    y^{j,i}*T(k)\mid \beta*{T+k},\sigma_j^2 \sim N(e_{T+k,j}^\top \beta_{T+k},\ \sigma_j^2),
+    ]
+    with explicit mapping from ((j,k)) to the appropriate selector/design vector.
+
+11. **Forecast evolution**
+    [
+    \beta_t \mid \beta_{t-1} \sim N(G_t^\beta \beta_{t-1}, W^\beta_t),
+    ]
+    with the same structural choices as before.
+
+12. **Multiple observations at the same time**
+    Define a general “observation list” representation:
+    [
+    y_{t,n} \mid x_t \sim N(H_{t,n} x_t,\ R_{t,n}),
+    ]
+    so you can describe sequential assimilation cleanly.
+
+---
+
+## C. Prior specification (mirror the original, but drop (\gamma)-priors and exAL latent priors)
+
+13. **Initial states**
+
+* (\alpha_0 \sim N(m_0, C_0))
+* (\delta^j_0 \sim N(m_0^{\delta j}, C_0^{\delta j}))
+* (\beta_T \sim N(m_T^\beta, C_T^\beta)) (if you initialize forecast from filtered/smoothed historical)
+
+14. **Observation variances**
+    Pick (and then derive with) one consistent option:
+
+* Conjugate: (\sigma_j^2 \sim \mathrm{IG}(a_{\sigma j}, b_{\sigma j})), independently over (j).
+* Or fixed/known (\sigma_j^2) (then MCMC becomes pure Gaussian-state sampling; VB simplifies).
+
+15. **Evolution covariances**
+
+* (W^\theta_t, W^\psi_t, W^{\delta j}_t, W^\beta_t): either
+
+  * discount-factor specified (no posterior update), **or**
+  * (W \sim \mathrm{IW}(\nu, S)) (time-constant) / blockwise IW priors and updates.
+
+16. **Transfer coefficient**
+
+* (\lambda): specify prior (Normal, truncated Normal for stationarity, or transformed parameter); this choice determines whether MCMC is Gibbs or needs MH.
+
+Deliverable: a single consolidated “Prior block” section.
+
+---
+
+## D. Full joint distribution (must be explicit and factorized)
+
+17. Write:
+    [
+    p(\text{data},\text{states},\text{params})
+    = p(\text{init}),
+    \prod_t p(\text{transitions}),
+    \prod_{t}\prod_{\text{obs at }t} p(\text{likelihood}),
+    p(\text{priors on params}).
+    ]
+
+18. Provide the **exact product structure** separately for:
+
+* Historical-only Model A,
+* Historical + retrospective Model B,
+* Forecast Model C (ensemble observations).
+
+Deliverable: a “boxed” factorization mirroring the original PDF.
+
+---
+
+## E. Full conditional posteriors (Gaussian case: the core work is now standard)
+
+### E1) State posteriors via FFBS / simulation smoothing
+
+19. **Derive conditional Gaussian form**
+    Given parameters ((\sigma^2, W,\lambda,\dots)), show:
+    [
+    p(x_{0:T}\mid \text{data},\text{params}) \text{ is Gaussian},
+    ]
+    where (x_t) is (\alpha_t) or the stacked state including discrepancies.
+
+20. **Filtering recursions**
+    Write the Kalman filter update equations in the form that supports *multiple observations per time*.
+
+21. **FFBS / simulation smoother**
+    Derive the backward sampling:
+
+* (x_T \sim N(m_T, C_T))
+* (x_t \mid x_{t+1} \sim N(h_t, H_t)) with explicit (h_t,H_t).
+
+22. **Sequential assimilation for large ensembles**
+    Show how to update ((m_t,C_t)) when you have (n_t) scalar observations at time (t) without forming a giant (n_t\times n_t) matrix.
+
+Deliverable: an FFBS section reusable across A/B/C by swapping ((H,R)).
+
+### E2) Variance and covariance parameter posteriors (conjugate)
+
+23. **Observation variances**
+    With IG priors, derive:
+    [
+    \sigma_j^2 \mid \cdot \sim \mathrm{IG}!\left(a_{\sigma j}+\frac{N_j}{2},\ b_{\sigma j}+\frac{1}{2}\sum_{n\in I_j} (y_n-\mu_n)^2\right),
+    ]
+    where the indexing (I_j) includes all observations governed by (\sigma_j^2) (historical+retrospective+forecast, if that’s your modeling choice).
+
+24. **Evolution covariances**
+    For any block (W) with IW prior, derive IW full conditional from innovation sums:
+    [
+    W \mid \cdot \sim \mathrm{IW}\left(\nu_0 + T,\ S_0 + \sum_t (x_t - Gx_{t-1})(x_t - Gx_{t-1})^\top\right).
+    ]
+
+25. **(\lambda) update**
+    Depending on your chosen prior:
+
+* If conjugate (Normal) and linear-Gaussian: derive Normal conditional.
+* If constrained (stationarity): derive MH step or transformed-variable Gibbs.
+
+Deliverable: a “Full conditionals” section with one subsection per parameter block.
+
+---
+
+## F. MCMC algorithm (now mostly Gibbs)
+
+26. **Specify parameter/state blocks**
+
+* Block 1: sample state trajectories (one or more FFBS calls; possibly on a stacked state).
+* Block 2: sample ({\sigma_j^2}) (IG).
+* Block 3: sample evolution covariances (W) (IW) or skip if discount-fixed.
+* Block 4: sample (\lambda) and any other static coefficients.
+
+27. **Choose your state blocking strategy (document it)**
+
+* Option A (single stacked state): sample ((\alpha_t,\delta^1_t,\dots,\delta^J_t)) jointly via FFBS (larger dimension, fewer sweeps).
+* Option B (conditional blocks): sample (\alpha_{0:T}) given discrepancies, then each (\delta^j_{0:T}) given (\alpha) (smaller FFBS calls, more sweeps).
+
+28. **Forecast-period assimilation**
+    State whether you sample (\beta_{T:T+K}) jointly with historical states or as a conditional forecast smoother given terminal historical distribution.
+
+29. **Diagnostics**
+    List what to monitor: trace plots for (\sigma_j^2), innovation norms for (W), and posterior predictive checks.
+
+Deliverable: pseudocode in the exact style of the original.
+
+---
+
+## G. Variational Bayes (VB-CAVI) plan (much simpler than exAL)
+
+30. **Select factorization**
+    A natural mirror of the original:
+    [
+    q(\text{states},\sigma^2,W,\lambda)=
+    q(\text{states}),
+    \prod_j q(\sigma_j^2),
+    \prod_b q(W_b),
+    q(\lambda).
+    ]
+
+31. **Derive coordinate updates**
+
+* (q(\text{states})): Gaussian. Update by running a Kalman smoother where you replace
+
+  * (R^{-1}) with (\mathbb{E}_q[R^{-1}]),
+  * and use expected natural parameters.
+* (q(\sigma_j^2)): IG with updated shape/rate using (\mathbb{E}_q[(y-\mu)^2]).
+* (q(W_b)): IW using (\mathbb{E}*q[(x_t-Gx*{t-1})(\cdot)^\top]).
+* (q(\lambda)): conjugate Normal if you choose it; otherwise approximate (but you can keep it conjugate by design).
+
+32. **List all expectations needed (explicit checklist)**
+
+* (\mathbb{E}[1/\sigma_j^2]), (\mathbb{E}[\log \sigma_j^2])
+* (\mathbb{E}[W_b^{-1}]), (\mathbb{E}[\log|W_b|])
+* (\mathbb{E}[x_t]), (\mathbb{E}[x_tx_t^\top]), (\mathbb{E}[x_tx_{t-1}^\top]) from the smoother output
+
+33. **ELBO**
+    Derive an ELBO decomposition mirroring the original:
+
+* likelihood term (Gaussian)
+* transition terms
+* prior terms (IG/IW/Normal)
+* entropies for Gaussian/IG/IW/Normal factors
+
+Deliverable: VB algorithm pseudocode + ELBO formula list.
+
+---
+
+## H. FFBS-like implementation details (document as “computational notes”)
+
+34. **Missing data handling**: skip update when an observation is missing.
+
+35. **Many observations per time**: sequential scalar updates to avoid large inversions.
+
+36. **Numerical stability**: Cholesky-based updates, symmetry enforcement for covariances.
+
+37. **Complexity accounting**: state dimension vs number of observations per time; when to prefer block vs conditional sampling.
+
+Deliverable: a short section ensuring the derivations are computable.
+
+---
+
+## I. Validation checklist (to keep the new derivation trustworthy)
+
+38. **Reduction checks**
+
+* If (J=0) and no transfer: recover a standard DLM.
+* If discrepancies are zero: retrospective products collapse to the baseline mean.
+* If forecast period is absent: Model C collapses.
+
+39. **Posterior consistency**
+
+* Compare VB posterior means against long-run MCMC means in small synthetic examples.
+
+40. **Implementation invariants**
+
+* Ensure the same data-to-variance mapping (j\mapsto\sigma_j^2) is used everywhere (historical, retrospective, forecast).
+
+---
+
+## Minimal “table of contents” for the new PDF (recommended)
+
+1. Notation and data structure
+2. Model A (Gaussian DLM + transfer)
+3. Model B (Gaussian multi-product with discrepancy states)
+4. Model C (Gaussian ensemble forecast model)
+5. Priors
+6. Full joint distribution
+7. Full conditional posteriors
+8. FFBS / simulation smoothing (with multiple obs per time)
+9. MCMC algorithm
+10. Variational Bayes (CAVI) + ELBO
+11. Computational notes + validation checks
+
+This is the full derivation plan in the same logical order as your exAL-based document, with every removed component explicitly accounted for (no (\gamma), no (p_0), no ((v,s)), no Laplace–Delta block).
+
+----------------------
+
+## Section 1 — Notation and full model statement (Gaussian likelihood)
+
+### 1.1 Index sets, time partition, and data objects
+
+Let (t\in{1,\dots,T}) denote the historical period. Let the forecast period be (t\in{T+1,\dots,T+K}), where (K\ge 1). We consider (J\ge 1) external model products plus the “target” series (indexed by (j=0)).
+
+* Target (truth/verification): ({y^0_t}_{t=1}^T), scalar.
+* Retrospective products (historical): ({z_{jt}}_{t=1}^T) for (j=1,\dots,J), scalar.
+* Forecast ensemble products: for a subset of forecasters (j\in{1,\dots,J_f}\subseteq{1,\dots,J}),
+
+  * lead time index (k\in{1,\dots,K(j)}),
+  * member index (i\in{1,\dots,I_j}),
+  * scalar forecast observation (y_T^{j,i}(k)), interpreted as an observation at forecast-time index (t=T+k).
+
+It will be convenient to treat the forecast observations as a collection of scalar observations at each forecast-time (t=T+k):
+[
+\mathcal{Y}*{T+k}
+:=\Big{y_T^{j,i}(k);:; j=1,\dots,J_f,; i=1,\dots,I_j\Big}.
+]
+Let (n*{T+k} := \sum_{j=1}^{J_f} I_j) denote the number of scalar observations at forecast time (T+k) (for the common case where all models issue all members at each (k); otherwise define (n_{T+k}) as the actual count).
+
+---
+
+### 1.2 Latent states and dimensions
+
+#### Baseline state (trend/seasonal component)
+
+Let (\theta_t \in \mathbb{R}^{q}) denote the baseline DLM state (e.g., trend + seasonal).
+
+#### Transfer-function component (historical period)
+
+Let:
+
+* (\zeta_t \in \mathbb{R}) be a scalar latent “transfer” state.
+* (\psi_t \in \mathbb{R}^{m}) be a regression-effect state with covariates (x_t\in\mathbb{R}^m).
+* (\lambda\in\mathbb{R}) be the AR(1) coefficient for (\zeta_t).
+
+Define the stacked historical state:
+[
+\boxed{
+\alpha_t :=
+\begin{pmatrix}
+\theta_t\
+\zeta_t\
+\psi_t
+\end{pmatrix}
+\in \mathbb{R}^{q+1+m}.
+}
+]
+
+#### Discrepancy states (retrospective products)
+
+For each retrospective product (j=1,\dots,J), let (\delta_t^j \in \mathbb{R}^{q}) denote a discrepancy state, aligned with (\theta_t).
+
+#### Forecast stacked state (forecast period)
+
+Let (J_f) be the number of forecasting products included in the forecast ensemble stage. Define
+[
+\boxed{
+\beta_t :=
+\begin{pmatrix}
+\theta_t\
+\delta_t^1\
+\vdots\
+\delta_t^{J_f}
+\end{pmatrix}
+\in \mathbb{R}^{q(1+J_f)},
+\qquad t=T,\dots,T+K.
+}
+]
+(If you initialize forecast at (t=T) from the historical filter/smoother, this indexing is natural.)
+
+---
+
+### 1.3 Design vectors and observation means
+
+#### Baseline/transfer mean (historical)
+
+Let (F_t\in\mathbb{R}^q) be the baseline DLM design vector for (\theta_t). Define the augmented design vector (\tilde F_t\in\mathbb{R}^{q+1+m}) such that
+[
+\boxed{
+\mu_t^0 := \tilde F_t^\top \alpha_t,
+\qquad
+\tilde F_t :=
+\begin{pmatrix}
+F_t\
+1\
+0_m
+\end{pmatrix},
+}
+]
+where (0_m) is the (m)-vector of zeros. (If your transfer function uses (\zeta_t) additively and (\psi_t) enters through the evolution of (\zeta_t), then (\tilde F_t) above matches the skeleton; modify (\tilde F_t) only if your original document did.)
+
+#### Retrospective product means (historical)
+
+For each (j=1,\dots,J),
+[
+\boxed{
+\mu_{jt} := \tilde F_t^\top \alpha_t + F_t^\top \delta_t^j.
+}
+]
+
+#### Forecast ensemble means (forecast period)
+
+At forecast time (t=T+k), for product (j\in{1,\dots,J_f}), define a selector/design vector (e_{t,j}\in\mathbb{R}^{q(1+J_f)}) such that
+[
+\boxed{
+\mu_{t}^{(j)} := e_{t,j}^\top \beta_t,
+\qquad t=T+1,\dots,T+K.
+}
+]
+Concretely, (e_{t,j}) picks out the baseline block plus the (j)-th discrepancy block in (\beta_t). One convenient explicit representation is:
+[
+e_{t,j}^\top \beta_t
+====================
+
+F_t^\top \theta_t + F_t^\top \delta_t^j,
+]
+so (e_{t,j}) is the block vector
+[
+e_{t,j} :=
+\begin{pmatrix}
+F_t\
+0\
+\vdots\
+0\
+F_t\
+0\
+\vdots\
+0
+\end{pmatrix},
+]
+where the second (F_t) sits in the (j)-th discrepancy block. (If your forecast design differs from (F_t), replace (F_t) by the forecast design (F_{t}^{(f)}) consistently.)
+
+---
+
+### 1.4 Observation models (Gaussian likelihood)
+
+We assume conditionally independent Gaussian observations given states and variances, with source-specific variances (\sigma_j^2).
+
+#### (A) Baseline target series (historical)
+
+[
+\boxed{
+y_t^0 \mid \alpha_t,\sigma_0^2 \sim N(\tilde F_t^\top \alpha_t,\ \sigma_0^2),
+\qquad t=1,\dots,T.
+}
+]
+
+#### (B) Retrospective products (historical)
+
+For each (j=1,\dots,J),
+[
+\boxed{
+z_{jt} \mid \alpha_t,\delta_t^j,\sigma_j^2 \sim N(\tilde F_t^\top \alpha_t + F_t^\top \delta_t^j,\ \sigma_j^2),
+\qquad t=1,\dots,T.
+}
+]
+
+#### (C) Forecast ensemble members (forecast period)
+
+For each (k\in{1,\dots,K(j)}), member (i\in{1,\dots,I_j}), and (j=1,\dots,J_f),
+[
+\boxed{
+y_T^{j,i}(k)\mid \beta_{T+k},\sigma_j^2 \sim N(e_{T+k,j}^\top \beta_{T+k},\ \sigma_j^2).
+}
+]
+Conditional independence across ensemble members holds given ((\beta_{T+k},\sigma_j^2)).
+
+---
+
+### 1.5 State evolution models (Gaussian transitions)
+
+#### Historical stacked state (\alpha_t)
+
+We use the skeleton evolution:
+[
+\boxed{
+\alpha_t \mid \alpha_{t-1} \sim N(\tilde G_t\alpha_{t-1},\ \tilde W_t),
+\qquad t=1,\dots,T,
+}
+]
+with block structure matching:
+
+* (\theta_t\mid\theta_{t-1}\sim N(G_t\theta_{t-1},W_t^\theta)),
+* (\zeta_t\mid(\zeta_{t-1},\psi_t)\sim N(\lambda\zeta_{t-1}+x_t^\top\psi_t,\ w_t^\zeta)),
+* (\psi_t\mid\psi_{t-1}\sim N(\psi_{t-1},W_t^\psi)).
+
+Equivalently, (\tilde G_t) and (\tilde W_t) can be written (one common choice) as
+[
+\tilde G_t=
+\begin{pmatrix}
+G_t & 0 & 0\
+0 & \lambda & x_t^\top\
+0 & 0 & I_m
+\end{pmatrix},
+\qquad
+\tilde W_t=
+\begin{pmatrix}
+W_t^\theta & 0 & 0\
+0 & w_t^\zeta & 0\
+0 & 0 & W_t^\psi
+\end{pmatrix}.
+]
+(If your original transfer specification differs, keep the same (\tilde G_t,\tilde W_t) from `exDQLM___Ensemble.pdf` and only change the likelihood.)
+
+#### Discrepancy evolution (historical)
+
+For each (j=1,\dots,J),
+[
+\boxed{
+\delta_t^j \mid \delta_{t-1}^j \sim N(G_t\delta_{t-1}^j,\ W_t^{\delta j}),
+\qquad t=1,\dots,T.
+}
+]
+Discrepancy processes are conditionally independent across (j) given their parameters.
+
+#### Forecast stacked state (\beta_t)
+
+For forecast times (t=T+1,\dots,T+K),
+[
+\boxed{
+\beta_t \mid \beta_{t-1} \sim N(G_t^\beta \beta_{t-1},\ W_t^\beta).
+}
+]
+Typically (G_t^\beta) is block-diagonal with repeated (G_t) on each (q)-block; likewise (W_t^\beta) is block-diagonal with corresponding covariance blocks (baseline and each discrepancy). Use the same block structure as in the original ensemble model section.
+
+---
+
+### 1.6 Initial conditions and parameters
+
+Let the static parameters be
+[
+\Theta := {\sigma_0^2,\sigma_1^2,\dots,\sigma_J^2}\ \cup\ {\lambda}\ \cup\ {W\text{-blocks}}.
+]
+
+Initial priors (default placeholders; formal priors appear in Section 2+):
+[
+\boxed{
+\alpha_0 \sim N(m_0,C_0),
+\qquad
+\delta_0^j \sim N(m_0^{\delta j},C_0^{\delta j})\ (j=1,\dots,J),
+\qquad
+\beta_T \sim N(m_T^\beta,C_T^\beta).
+}
+]
+If (\beta_T) is constructed from historical filtering/smoothing at (t=T), then ((m_T^\beta,C_T^\beta)) is induced, not separately specified; state explicitly which convention you adopt.
+
+---
+
+### Dependencies
+
+None (first section).
+-------------
+
+## Section 2 — Full joint density (Models A/B/C; Gaussian likelihood)
+
+### 2.1 Static parameters, latent states, and prior block (canonical grouping)
+
+Collect static parameters as
+[
+\Theta
+:=\Big({\sigma_j^2}*{j=0}^J,\ \lambda,\ \mathcal{W}\Big),
+]
+where (\mathcal{W}) denotes all evolution-covariance blocks you treat as unknown (e.g., (W_t^\theta, W_t^\psi, w_t^\zeta, {W_t^{\delta j}}*{j=1}^J), and/or the forecast-period blocks inside (W_t^\beta)). If you instead fix some blocks via discount factors, those blocks are removed from (\mathcal{W}) and treated as known constants.
+
+Define latent trajectories:
+
+* Historical baseline+transfer: (\alpha_{0:T}:={\alpha_t}_{t=0}^T).
+* Historical discrepancies: (\delta_{0:T}^{1:J}:={\delta_t^j: t=0,\dots,T,\ j=1,\dots,J}).
+* Forecast stacked trajectory: (\beta_{T:T+K}:={\beta_t}_{t=T}^{T+K}).
+
+Define data:
+[
+\mathcal{D}*{\text{hist}} := {y_t^0}*{t=1}^T \cup {z_{jt}}*{j=1,\dots,J;\ t=1,\dots,T},
+\qquad
+\mathcal{D}*{\text{fcast}} := {y_T^{j,i}(k)}.
+]
+
+---
+
+### 2.2 Priors (default conjugate form; used for the factorization)
+
+Observation variances (independent):
+[
+\boxed{
+\sigma_j^2 \sim \mathrm{IG}(a_{\sigma j},b_{\sigma j}),\qquad j=0,1,\dots,J.
+}
+]
+Transfer coefficient:
+[
+\boxed{
+\lambda \sim N(m_\lambda,s_\lambda^2)
+\quad\text{or}\quad
+\lambda\ \text{fixed (known)}.
+}
+]
+Initial states:
+[
+\boxed{
+\alpha_0 \sim N(m_0,C_0),\qquad
+\delta_0^j \sim N(m_0^{\delta j},C_0^{\delta j})\ (j=1,\dots,J),\qquad
+\beta_T \sim N(m_T^\beta,C_T^\beta).
+}
+]
+Evolution covariances (if learned) as independent blocks:
+[
+\boxed{
+W_b \sim \mathrm{IW}(\nu_b,S_b),\qquad b\in\mathcal{B},
+}
+]
+where (\mathcal{B}) indexes whichever covariance blocks you treat as unknown. (If discount-factor specified, omit these priors and treat (W_b) as known.)
+
+---
+
+### 2.3 Model A: baseline target series only (historical)
+
+**Likelihood (historical target).** Using Section 1,
+[
+p(y_{1:T}^0\mid \alpha_{1:T},\sigma_0^2)
+=\prod_{t=1}^T
+\phi!\left(y_t^0;\ \tilde F_t^\top\alpha_t,\ \sigma_0^2\right),
+]
+where (\phi(\cdot;\mu,\sigma^2)) is the (N(\mu,\sigma^2)) density.
+
+**State evolution.**
+[
+p(\alpha_{0:T}\mid \lambda,\mathcal{W}_\alpha)
+==============================================
+
+p(\alpha_0)\prod_{t=1}^T
+\phi_{q+1+m}!\left(\alpha_t;\ \tilde G_t(\lambda)\alpha_{t-1},\ \tilde W_t\right),
+]
+where (\phi_d(\cdot;\mu,\Sigma)) is the (d)-variate Normal density and (\tilde G_t(\lambda)) indicates the dependence on (\lambda) (if applicable).
+
+**Full joint (Model A).**
+Let (\Theta_A := (\sigma_0^2,\lambda,\mathcal{W}*\alpha)). Then
+[
+\boxed{
+p(\mathcal{D}*{\text{A}},\alpha_{0:T},\Theta_A)
+===============================================
+
+p(\sigma_0^2),p(\lambda),p(\mathcal{W}*\alpha),
+p(\alpha_0),
+\prod*{t=1}^T
+\phi!\left(y_t^0;\tilde F_t^\top\alpha_t,\sigma_0^2\right)
+\prod_{t=1}^T
+\phi_{d_\alpha}!\left(\alpha_t;\tilde G_t(\lambda)\alpha_{t-1},\tilde W_t\right),
+}
+]
+where (d_\alpha=q+1+m) and (\mathcal{D}*{\text{A}}={y_t^0}*{t=1}^T).
+
+---
+
+### 2.4 Model B: baseline + retrospective products with discrepancies (historical)
+
+**Retrospective likelihood.**
+[
+p(z_{1:J,1:T}\mid \alpha_{1:T},\delta_{1:T}^{1:J},{\sigma_j^2}_{j=1}^J)
+=======================================================================
+
+\prod_{j=1}^J\prod_{t=1}^T
+\phi!\left(z_{jt};\ \tilde F_t^\top\alpha_t + F_t^\top\delta_t^j,\ \sigma_j^2\right).
+]
+
+**Discrepancy evolutions.**
+[
+p(\delta_{0:T}^{1:J}\mid \mathcal{W}_\delta)
+============================================
+
+\prod_{j=1}^J
+\left[
+p(\delta_0^j)\prod_{t=1}^T
+\phi_q!\left(\delta_t^j;\ G_t\delta_{t-1}^j,\ W_t^{\delta j}\right)
+\right].
+]
+
+**Full joint (Model B).**
+Let (\Theta_B := ({\sigma_j^2}*{j=0}^J,\lambda,\mathcal{W}*\alpha,\mathcal{W}*\delta)) and (\mathcal{D}*{\text{B}}:={y_t^0}*{t=1}^T\cup{z*{jt}}). Then
+[
+\boxed{
+\begin{aligned}
+p(\mathcal{D}*{\text{B}},\alpha*{0:T},\delta_{0:T}^{1:J},\Theta_B)
+&=
+\Big[\prod_{j=0}^J p(\sigma_j^2)\Big],
+p(\lambda),p(\mathcal{W}*\alpha),p(\mathcal{W}*\delta),
+p(\alpha_0),
+\prod_{t=1}^T
+\phi!\left(y_t^0;\tilde F_t^\top\alpha_t,\sigma_0^2\right)\
+&\quad\times
+\prod_{t=1}^T
+\phi_{d_\alpha}!\left(\alpha_t;\tilde G_t(\lambda)\alpha_{t-1},\tilde W_t\right)
+\times
+\prod_{j=1}^J
+\left[
+p(\delta_0^j)\prod_{t=1}^T
+\phi_q!\left(\delta_t^j;\ G_t\delta_{t-1}^j,\ W_t^{\delta j}\right)
+\right]\
+&\quad\times
+\prod_{j=1}^J\prod_{t=1}^T
+\phi!\left(z_{jt};\tilde F_t^\top\alpha_t + F_t^\top\delta_t^j,\sigma_j^2\right).
+\end{aligned}
+}
+]
+
+---
+
+### 2.5 Model C: forecast-period ensemble likelihood and forecast stacked state
+
+This section defines the joint density for the forecast period. Two conventions are common:
+
+* **(C1) Conditional forecast model given a terminal distribution at (t=T)**: treat (\beta_T) as given by historical filtering/smoothing (random with known (N(m_T^\beta,C_T^\beta))).
+* **(C2) Fully joint across historical and forecast**: define (\beta_T) deterministically from historical states (or include coupling constraints) and sample jointly.
+
+Below is the factorization for **(C1)**, which is closest to your original “ensemble model” presentation style.
+
+**Forecast likelihood.** Let (t=T+k). For each scalar ensemble observation at time (t),
+[
+p(\mathcal{Y}_{t}\mid \beta_t,{\sigma_j^2})
+===========================================
+
+\prod_{j=1}^{J_f}\prod_{i=1}^{I_j}
+\phi!\left(y_T^{j,i}(k);\ e_{t,j}^\top\beta_t,\ \sigma_j^2\right).
+]
+
+**Forecast evolution.**
+[
+p(\beta_{T:T+K}\mid \mathcal{W}_\beta)
+======================================
+
+p(\beta_T)\prod_{t=T+1}^{T+K}
+\phi_{d_\beta}!\left(\beta_t;\ G_t^\beta\beta_{t-1},\ W_t^\beta\right),
+\qquad d_\beta=q(1+J_f).
+]
+
+**Full joint (Model C; conditional on terminal prior).**
+Let (\Theta_C := ({\sigma_j^2}*{j=1}^{J_f},\mathcal{W}*\beta)) (and include any other static parameters used in (G_t^\beta)). Then
+[
+\boxed{
+\begin{aligned}
+p(\mathcal{D}*{\text{fcast}},\beta*{T:T+K},\Theta_C)
+&=
+\Big[\prod_{j=1}^{J_f} p(\sigma_j^2)\Big],
+p(\mathcal{W}*\beta),
+p(\beta_T),
+\prod*{t=T+1}^{T+K}
+\phi_{d_\beta}!\left(\beta_t;\ G_t^\beta\beta_{t-1},\ W_t^\beta\right)\
+&\quad\times
+\prod_{k=1}^{K}
+\prod_{j=1}^{J_f}\prod_{i=1}^{I_j}
+\phi!\left(y_T^{j,i}(k);\ e_{T+k,j}^\top\beta_{T+k},\ \sigma_j^2\right).
+\end{aligned}
+}
+]
+
+**Optional (C2) coupling note.** If (\beta_T) is constructed from ((\theta_T,\delta_T^1,\dots)) coming from Model B, then replace (p(\beta_T)) by an induced distribution (or a Dirac constraint) and write a single joint density over ((\alpha,\delta,\beta)). In that case, Model C becomes a continuation of the same Markov chain with a larger state vector from (t=T) onward.
+
+---
+
+### 2.6 Full posterior (formal statement)
+
+For any chosen model (A/B/C), the full posterior is:
+[
+\boxed{
+p(\text{latent states},\Theta \mid \text{data})
+===============================================
+
+\frac{
+p(\text{data},\text{latent states},\Theta)
+}{
+p(\text{data})
+},
+}
+]
+where the numerator (p(\text{data},\text{latent states},\Theta)) is given by the corresponding boxed full joint above, and the evidence (p(\text{data})) is the normalizing constant.
+
+---
+
+### Dependencies
+
+* Section 1: definitions of (\alpha_t,\delta_t^j,\beta_t), observation means (\tilde F_t^\top\alpha_t), (\tilde F_t^\top\alpha_t+F_t^\top\delta_t^j), and (e_{t,j}^\top\beta_t); Gaussian likelihood statements; Gaussian transition models.
+
+-------
+## Section 3 — Conditional Gaussian state posterior (Kalman filter + FFBS / simulation smoothing)
+
+### 3.1 General linear–Gaussian state-space form (covers Models A/B/C)
+
+Fix the static parameters (\Theta) (variances, evolution covariances, (\lambda), etc.). Consider a latent Markov state ({x_t}*{t=t_0}^{t_1}) with
+[
+\boxed{
+x_t \mid x*{t-1} \sim N(G_t x_{t-1},, W_t),\qquad
+x_{t_0}\sim N(m_{t_0},C_{t_0}),
+}
+]
+and **scalar** observations at each time (t) given by an observation list
+[
+\boxed{
+y_{t,n}\mid x_t \sim N(h_{t,n}^\top x_t,\ r_{t,n}),\qquad n=1,\dots,n_t,
+}
+]
+conditionally independent across (n) given (x_t). Here (h_{t,n}) is a known design vector and (r_{t,n}>0) is a known variance (typically (r_{t,n}=\sigma_j^2) for some source (j)).
+
+#### Proposition 3.1 (Gaussian conditional state posterior)
+
+Given (\Theta) and the observation list ({(y_{t,n},h_{t,n},r_{t,n})}), the conditional posterior
+[
+p(x_{t_0:t_1}\mid {y_{t,n}},\Theta)
+]
+is multivariate Normal on (\mathbb{R}^{d(t_1-t_0+1)}) (with (d=\dim(x_t))), with block-tridiagonal precision induced by the Markov structure. In particular, it can be:
+
+* **evaluated** via Kalman filtering / smoothing recursions, and
+* **sampled exactly** via FFBS (simulation smoothing).
+
+---
+
+### 3.2 Mapping Models A/B/C into ((x_t,h_{t,n},r_{t,n}))
+
+Below are the **canonical** choices that preserve your Section 1 model skeleton.
+
+#### Model A (historical target only)
+
+State: (x_t=\alpha_t\in\mathbb{R}^{q+1+m}). For each (t=1,\dots,T):
+[
+n_t=1,\quad
+y_{t,1}=y_t^0,\quad
+h_{t,1}=\tilde F_t,\quad
+r_{t,1}=\sigma_0^2.
+]
+
+#### Model B (historical target + (J) retrospective products)
+
+Use a **stacked state** (recommended for a single FFBS call per sweep):
+[
+\boxed{
+x_t :=
+\begin{pmatrix}
+\alpha_t\
+\delta_t^1\
+\vdots\
+\delta_t^J
+\end{pmatrix}
+\in\mathbb{R}^{d_B},\qquad d_B=(q+1+m)+Jq,
+}
+]
+with block-diagonal evolution (G_t^B) and (W_t^B) induced by (\tilde G_t,\tilde W_t) and ((G_t,W_t^{\delta j})).
+
+At each (t\in{1,\dots,T}), build an observation list of size (n_t=1+J):
+
+* Target observation (y_t^0):
+  [
+  y_{t,0}=y_t^0,\quad
+  h_{t,0}=
+  \begin{pmatrix}
+  \tilde F_t\
+  0\ \vdots\ 0
+  \end{pmatrix},
+  \quad
+  r_{t,0}=\sigma_0^2.
+  ]
+* Retrospective product (z_{jt}) for each (j=1,\dots,J):
+  [
+  y_{t,j}=z_{jt},\quad
+  h_{t,j}=
+  \begin{pmatrix}
+  \tilde F_t\
+  0\ \vdots\ 0\
+  F_t\
+  0\ \vdots\ 0
+  \end{pmatrix},
+  \quad
+  r_{t,j}=\sigma_j^2,
+  ]
+  where the (F_t) appears in the block corresponding to (\delta_t^j).
+
+#### Model C (forecast ensemble)
+
+State: (x_t=\beta_t\in\mathbb{R}^{d_C}), (d_C=q(1+J_f)), for (t=T,\dots,T+K).
+
+At forecast time (t=T+k), define the observation list of size (n_t=\sum_{j=1}^{J_f} I_j) (or the realized count):
+[
+y_{t,(j,i)} = y_T^{j,i}(k),\quad
+h_{t,(j,i)} = e_{t,j},\quad
+r_{t,(j,i)}=\sigma_j^2.
+]
+All members share the same (h) and (r) within ((t,j)), differing only by the observed value.
+
+---
+
+### 3.3 Kalman filter with sequential assimilation of scalar observations
+
+This form is numerically stable and avoids large matrix inversions when (n_t) is large (critical in Model C).
+
+#### Prediction step
+
+Assume at time (t-1) we have filtered moments:
+[
+x_{t-1}\mid \mathcal{D}*{1:t-1} \sim N(m*{t-1},C_{t-1}).
+]
+Then the one-step predictive moments are
+[
+\boxed{
+a_t = G_t m_{t-1},\qquad
+R_t = G_t C_{t-1} G_t^\top + W_t.
+}
+]
+Initialize the “within-time” moments:
+[
+m_{t,0}=a_t,\qquad C_{t,0}=R_t.
+]
+
+#### Sequential assimilation for (n=1,\dots,n_t)
+
+For each scalar observation ((y_{t,n},h_{t,n},r_{t,n})), define:
+[
+\boxed{
+\begin{aligned}
+f_{t,n} &= h_{t,n}^\top m_{t,n-1},\
+q_{t,n} &= h_{t,n}^\top C_{t,n-1} h_{t,n} + r_{t,n},\
+e_{t,n} &= y_{t,n} - f_{t,n},\
+A_{t,n} &= C_{t,n-1} h_{t,n}, q_{t,n}^{-1}.
+\end{aligned}
+}
+]
+Then update:
+[
+\boxed{
+m_{t,n} = m_{t,n-1} + A_{t,n} e_{t,n},\qquad
+C_{t,n} = C_{t,n-1} - A_{t,n}A_{t,n}^\top q_{t,n}.
+}
+]
+After assimilating all observations at time (t), set
+[
+\boxed{
+m_t := m_{t,n_t},\qquad C_t := C_{t,n_t}.
+}
+]
+
+**Missing data.** If (y_{t,n}) is missing, skip that assimilation step (leave ((m_{t,n},C_{t,n})=(m_{t,n-1},C_{t,n-1}))).
+
+---
+
+### 3.4 FFBS / simulation smoothing (exact posterior sampling)
+
+Let (t_0) be the start time (e.g., (t_0=0) or (t_0=T) for forecast). Run the filter to obtain ({(m_t,C_t)}*{t=t_0}^{t_1}) and also store the predictive pairs ((a*{t+1},R_{t+1})) for (t=t_0,\dots,t_1-1).
+
+#### Backward sampling recursion
+
+First sample:
+[
+\boxed{
+x_{t_1}\sim N(m_{t_1},C_{t_1}).
+}
+]
+For (t=t_1-1,t_1-2,\dots,t_0), define the smoothing gain
+[
+\boxed{
+J_t = C_t G_{t+1}^\top R_{t+1}^{-1},
+\quad\text{where}\quad
+a_{t+1}=G_{t+1}m_t,\ R_{t+1}=G_{t+1}C_tG_{t+1}^\top+W_{t+1}.
+}
+]
+Then sample
+[
+\boxed{
+x_t \mid x_{t+1} \sim N!\Big(m_t + J_t(x_{t+1}-a_{t+1}),\ C_t - J_t R_{t+1} J_t^\top\Big).
+}
+]
+
+This produces an **exact draw** from (p(x_{t_0:t_1}\mid \text{data},\Theta)).
+
+---
+
+### 3.5 Practical notes for large (n_t) (forecast ensembles)
+
+* The sequential update in Section 3.3 requires only scalar inversions (q_{t,n}^{-1}), so total cost per time is (O(n_t d^2)) dominated by matrix–vector multiplications (with (d=\dim(x_t))).
+* If many observations share identical ((h_{t,n}, r_{t,n})) (as in Model C within each product (j)), you can optionally aggregate them to reduce constant factors (not required for correctness; can be documented later as an optimization).
+
+---
+
+### Dependencies
+
+* Section 1: definitions of state vectors (\alpha_t,\delta_t^j,\beta_t), designs (\tilde F_t,F_t,e_{t,j}), and Gaussian observation/evolution equations for Models A/B/C.
+* Section 2: the linear–Gaussian full joint factorization (implying Gaussian conditional posteriors when (\Theta) is fixed).
+---------
+
+
+## Section 4 — Full conditionals for static parameters (\Theta)
+
+Throughout this section, condition on the full latent trajectories (sampled via FFBS in Section 3) and on all remaining parameters not being updated in the current block. All full conditionals below are **closed-form** under the default priors (IG for (\sigma_j^2), IW for covariance blocks, Normal for (\lambda)).
+
+---
+
+### 4.1 Observation variances ({\sigma_j^2}): Inverse-Gamma updates
+
+Assume independent priors
+[
+\sigma_j^2 \sim \mathrm{IG}(a_{\sigma j}, b_{\sigma j}),
+\qquad j=0,1,\dots,J,
+]
+with density proportional to ((\sigma_j^2)^{-(a_{\sigma j}+1)}\exp{-b_{\sigma j}/\sigma_j^2}).
+
+#### Index sets of observations governed by (\sigma_j^2)
+
+Define residual collections per source (j).
+
+* **Target series ((j=0))** (historical):
+  [
+  e_{0,t} := y_t^0 - \tilde F_t^\top \alpha_t,\qquad t\in\mathcal{T}_0\subseteq{1,\dots,T}.
+  ]
+  (Let (\mathcal{T}_0) exclude missing observations.)
+
+* **Retrospective products ((j=1,\dots,J))** (historical):
+  [
+  e^{\text{hist}}*{j,t} := z*{jt} - \big(\tilde F_t^\top \alpha_t + F_t^\top \delta_t^j\big),
+  \qquad t\in\mathcal{T}_j^{\text{hist}}\subseteq{1,\dots,T}.
+  ]
+
+* **Forecast ensemble ((j=1,\dots,J_f))** (forecast period):
+  for each lead (k) and member (i),
+  [
+  e^{\text{fcast}}*{j,i,k} := y_T^{j,i}(k) - e*{T+k,j}^\top \beta_{T+k},
+  \qquad (i,k)\in\mathcal{I}_j^{\text{fcast}},
+  ]
+  where (\mathcal{I}_j^{\text{fcast}}) includes all available members/leads for that product.
+
+Define total counts and sum of squared errors (SSE):
+[
+N_0 := |\mathcal{T}_0|,
+\quad
+\mathrm{SSE}*0 := \sum*{t\in\mathcal{T}*0} e*{0,t}^2,
+]
+and for (j\ge 1),
+[
+N_j := |\mathcal{T}_j^{\text{hist}}| + |\mathcal{I}*j^{\text{fcast}}|,
+\quad
+\mathrm{SSE}*j :=
+\sum*{t\in\mathcal{T}*j^{\text{hist}}} \big(e^{\text{hist}}*{j,t}\big)^2
++
+\sum*{(i,k)\in\mathcal{I}*j^{\text{fcast}}} \big(e^{\text{fcast}}*{j,i,k}\big)^2,
+]
+with the understanding that if a given (j) has no forecast component, the second sum is absent.
+
+#### Full conditional
+
+[
+\boxed{
+\sigma_j^2 \mid \cdot \sim \mathrm{IG}!\left(a_{\sigma j}+\frac{N_j}{2},\ b_{\sigma j}+\frac{\mathrm{SSE}_j}{2}\right),
+\qquad j=0,1,\dots,J,
+}
+]
+(where for (j>J_f) the forecast SSE term is zero by definition).
+
+---
+
+### 4.2 Evolution covariance blocks: Inverse-Wishart (matrix) and IG (scalar) updates
+
+This subsection gives the generic conjugate update and then maps it to your blocks.
+
+#### 4.2.1 Generic IW update for a Gaussian transition covariance
+
+Let a (d)-dimensional Markov component satisfy (for (t=1,\dots,T^\star))
+[
+x_t \mid x_{t-1},W \sim N(G_t x_{t-1},, W),
+\qquad W \sim \mathrm{IW}(\nu_0,S_0),
+]
+with **time-constant** covariance (W). Define innovations
+[
+u_t := x_t - G_t x_{t-1}.
+]
+Then
+[
+\boxed{
+W \mid \cdot \sim \mathrm{IW}!\left(\nu_0 + T^\star,\ S_0 + \sum_{t=1}^{T^\star} u_t u_t^\top\right).
+}
+]
+
+If (W) is **scalar** (dimension 1), the IW reduces to an IG update. Concretely, for
+[
+u_t \mid w \sim N(0,w),\qquad w\sim \mathrm{IG}(a_0,b_0),
+]
+we have
+[
+\boxed{
+w\mid\cdot \sim \mathrm{IG}!\left(a_0+\frac{T^\star}{2},\ b_0+\frac{1}{2}\sum_{t=1}^{T^\star} u_t^2\right).
+}
+]
+
+> If you instead use **discount factors** (i.e., (W_t) is deterministically set as a function of (\delta) and filtered covariances), then **no full conditional exists** for (W_t); you treat (W_t) as known and skip this block in MCMC/VB.
+
+---
+
+#### 4.2.2 Mapping to the historical baseline+transfer components ((\alpha_t))
+
+##### Baseline DLM state (\theta_t)
+
+If (W^\theta) is learned and time-constant:
+[
+u_t^\theta := \theta_t - G_t \theta_{t-1},\quad t=1,\dots,T,
+]
+[
+\boxed{
+W^\theta \mid \cdot \sim \mathrm{IW}!\left(\nu_\theta + T,\ S_\theta + \sum_{t=1}^{T} u_t^\theta (u_t^\theta)^\top\right).
+}
+]
+(If (W_t^\theta) varies with (t), you either (i) fix it by design/discounting, or (ii) assign independent IW priors per (t), yielding (W_t^\theta\mid\cdot\sim \mathrm{IW}(\nu_\theta+1, S_\theta + u_t^\theta (u_t^\theta)^\top)), which is typically not recommended unless you explicitly want that flexibility.)
+
+##### Regression state (\psi_t)
+
+With (\psi_t \mid \psi_{t-1}\sim N(\psi_{t-1}, W^\psi)) (random walk) and IW prior:
+[
+u_t^\psi := \psi_t - \psi_{t-1},\quad t=1,\dots,T,
+]
+[
+\boxed{
+W^\psi \mid \cdot \sim \mathrm{IW}!\left(\nu_\psi + T,\ S_\psi + \sum_{t=1}^{T} u_t^\psi (u_t^\psi)^\top\right).
+}
+]
+
+##### Transfer innovation variance (w^\zeta) (scalar)
+
+With (\zeta_t \mid (\zeta_{t-1},\psi_t)\sim N(\lambda\zeta_{t-1}+x_t^\top\psi_t,\ w^\zeta)) and IG prior (w^\zeta\sim \mathrm{IG}(a_\zeta,b_\zeta)), define
+[
+u_t^\zeta := \zeta_t - \lambda \zeta_{t-1} - x_t^\top \psi_t,\quad t=1,\dots,T,
+]
+and update
+[
+\boxed{
+w^\zeta \mid \cdot \sim \mathrm{IG}!\left(a_\zeta + \frac{T}{2},\ b_\zeta + \frac{1}{2}\sum_{t=1}^{T} (u_t^\zeta)^2\right).
+}
+]
+(If you treat (w_t^\zeta) as time-varying via discounting, it is fixed and this update is skipped.)
+
+---
+
+#### 4.2.3 Mapping to discrepancy components (\delta_t^j)
+
+For each (j=1,\dots,J), with (\delta_t^j\mid\delta_{t-1}^j\sim N(G_t\delta_{t-1}^j, W^{\delta j})) and (W^{\delta j}\sim \mathrm{IW}(\nu_{\delta j},S_{\delta j})), define
+[
+u_t^{\delta j} := \delta_t^j - G_t \delta_{t-1}^j,\quad t=1,\dots,T,
+]
+[
+\boxed{
+W^{\delta j} \mid \cdot \sim \mathrm{IW}!\left(\nu_{\delta j} + T,\ S_{\delta j} + \sum_{t=1}^{T} u_t^{\delta j}(u_t^{\delta j})^\top\right).
+}
+]
+
+---
+
+#### 4.2.4 Forecast evolution covariance (W^\beta) (if explicitly modeled)
+
+If you treat the forecast stacked state as
+[
+\beta_t\mid \beta_{t-1}\sim N(G_t^\beta \beta_{t-1}, W^\beta),
+\quad t=T+1,\dots,T+K,
+]
+with (W^\beta\sim\mathrm{IW}(\nu_\beta,S_\beta)), define
+[
+u_t^\beta := \beta_t - G_t^\beta \beta_{t-1},\quad t=T+1,\dots,T+K,
+]
+and update
+[
+\boxed{
+W^\beta \mid \cdot \sim \mathrm{IW}!\left(\nu_\beta + K,\ S_\beta + \sum_{t=T+1}^{T+K} u_t^\beta (u_t^\beta)^\top\right).
+}
+]
+(If instead you carry the historical evolution for (\theta_t) and (\delta_t^j) forward into the forecast period with the **same** covariances (W^\theta, W^{\delta j}), then you do not need a separate (W^\beta); you simply extend the corresponding innovation sums to (t=T+1,\dots,T+K) for those components.)
+
+---
+
+### 4.3 Transfer coefficient (\lambda): Normal (or truncated Normal) update
+
+Assume (\lambda) is unknown and has prior (\lambda\sim N(m_\lambda,s_\lambda^2)). Condition on the sampled trajectories ({\zeta_t,\psi_t}_{t=0}^T) and on (w^\zeta) (or ({w_t^\zeta})).
+
+From the transfer evolution:
+[
+\zeta_t = \lambda \zeta_{t-1} + x_t^\top \psi_t + \eta_t,\qquad \eta_t\sim N(0,w^\zeta),
+]
+define the “regression response”
+[
+y_t^\lambda := \zeta_t - x_t^\top \psi_t.
+]
+Then
+[
+y_t^\lambda = \lambda \zeta_{t-1} + \eta_t.
+]
+
+#### Case 1: (w^\zeta) constant over time
+
+Let (w^\zeta>0) be scalar. Define sufficient statistics
+[
+S_{xx} := \sum_{t=1}^T \zeta_{t-1}^2,\qquad
+S_{xy} := \sum_{t=1}^T \zeta_{t-1} y_t^\lambda.
+]
+Then the full conditional is Normal:
+[
+\boxed{
+\lambda \mid \cdot \sim N(m_{\lambda\mid},, s_{\lambda\mid}^2),
+}
+]
+with
+[
+\boxed{
+s_{\lambda\mid}^{-2} = s_\lambda^{-2} + \frac{1}{w^\zeta} S_{xx},
+\qquad
+m_{\lambda\mid} = s_{\lambda\mid}^2\left(s_\lambda^{-2}m_\lambda + \frac{1}{w^\zeta} S_{xy}\right).
+}
+]
+
+If you enforce stationarity (|\lambda|<1), then
+[
+\boxed{
+\lambda\mid\cdot \sim N(m_{\lambda\mid},s_{\lambda\mid}^2)\ \text{truncated to }(-1,1).
+}
+]
+
+#### Case 2: (w_t^\zeta) time-varying (known given discounting)
+
+Use weights (w_t^\zeta) and define
+[
+S_{xx} := \sum_{t=1}^T \frac{\zeta_{t-1}^2}{w_t^\zeta},\qquad
+S_{xy} := \sum_{t=1}^T \frac{\zeta_{t-1} y_t^\lambda}{w_t^\zeta}.
+]
+Then the same Normal form holds with (S_{xx},S_{xy}) as above:
+[
+\boxed{
+s_{\lambda\mid}^{-2} = s_\lambda^{-2} + S_{xx},
+\qquad
+m_{\lambda\mid} = s_{\lambda\mid}^2\left(s_\lambda^{-2}m_\lambda + S_{xy}\right).
+}
+]
+
+---
+
+### Dependencies
+
+* Section 1: definitions of observation means and evolution equations for (\theta_t,\zeta_t,\psi_t,\delta_t^j,\beta_t).
+* Section 3: FFBS provides sampled trajectories (\alpha_{0:T}), (\delta_{0:T}^{1:J}), (\beta_{T:T+K}) used to compute residuals and innovations.
+
+--------
+
+## Section 5 — MCMC algorithm (blocked Gibbs; FFBS-based state updates)
+
+This section gives an exact MCMC scheme for the Gaussian-likelihood version. Under the default priors (IG for (\sigma_j^2), IW for covariance blocks, Normal for (\lambda)), the sampler is **fully Gibbs** except for optional constraints (e.g., truncating (\lambda\in(-1,1))). The core step is **FFBS / simulation smoothing** for the latent state trajectories (Section 3).
+
+---
+
+### 5.1 Target posterior and blocking options
+
+Let (\mathcal{D}) denote the observed data for the model under consideration:
+
+* Model A: (\mathcal{D}={y_t^0}_{t=1}^T).
+* Model B: (\mathcal{D}={y_t^0}*{t=1}^T \cup {z*{jt}}_{j=1..J,\ t=1..T}).
+* Model C: (\mathcal{D}={y_T^{j,i}(k)}) (plus an initial prior for (\beta_T)).
+
+The posterior is (p(\text{states},\Theta\mid \mathcal{D})) with (\Theta=({\sigma_j^2},\lambda,\mathcal{W})).
+
+#### Blocking choice for Model B (historical + discrepancies)
+
+Two correct variants:
+
+* **(B-joint)** single FFBS on the stacked state
+  [
+  x_t=\big(\alpha_t^\top,(\delta_t^1)^\top,\dots,(\delta_t^J)^\top\big)^\top\in\mathbb{R}^{(q+1+m)+Jq}.
+  ]
+  Pros: one smoother call per iteration; captures posterior correlations strongly.
+  Cons: state dimension can be large if (J) is large.
+
+* **(B-blocked)** alternating FFBS calls:
+  sample (\alpha_{0:T}\mid \delta^{1:J}*{0:T}) and then each (\delta^j*{0:T}\mid \alpha_{0:T}) (or in small blocks).
+  Pros: smaller state dimension per smoother call.
+  Cons: more smoother calls per iteration; potentially higher autocorrelation.
+
+Both preserve exactness.
+
+---
+
+### 5.2 One-iteration update blocks (generic)
+
+At iteration (s), given current values (\Theta^{(s-1)}):
+
+1. **State trajectory update(s)** by FFBS (Section 3)
+2. **Observation variances** ({\sigma_j^2}) by IG (Section 4.1)
+3. **Evolution covariances** (\mathcal{W}) by IW/IG (Section 4.2) or skip if fixed by discounting
+4. **(\lambda)** by Normal / truncated Normal (Section 4.3) or skip if fixed
+
+These blocks define a valid Gibbs sampler because each draw is from the corresponding full conditional.
+
+---
+
+### 5.3 Explicit Gibbs sampler pseudocode (Model B + optional Model C)
+
+#### Algorithm 5.1 (Gaussian DQLM Gibbs sampler; FFBS core)
+
+**Inputs**
+
+* Data: ({y_t^0}*{t=1}^T), ({z*{jt}}_{j=1..J,t=1..T}), and optionally ({y_T^{j,i}(k)}).
+* Known design/evolution objects: (\tilde F_t, F_t, \tilde G_t(\lambda), G_t, G_t^\beta), etc.
+* Priors: (\sigma_j^2\sim \mathrm{IG}(a_{\sigma j},b_{\sigma j})); (W_b\sim \mathrm{IW}(\nu_b,S_b)) (or fixed); (\lambda\sim N(m_\lambda,s_\lambda^2)) (or fixed); initial-state priors.
+* MCMC controls: iterations (S), burn-in (S_0), thinning (L).
+
+**Initialize** (\Theta^{(0)}), and initial state trajectories (optional) or just initial moments for filtering.
+
+---
+
+**For** (s=1,\dots,S):
+
+**(1) State trajectory draw(s)**
+
+* **Model A:** draw (\alpha_{0:T}^{(s)} \sim p(\alpha_{0:T}\mid y^0_{1:T},\Theta^{(s-1)})) via FFBS with ((h_{t,1},r_{t,1})=(\tilde F_t,\sigma_0^2)).
+
+* **Model B (choose one):**
+
+  **(B-joint)**
+  Define stacked state (x_t=(\alpha_t,\delta_t^1,\dots,\delta_t^J)).
+  Build the observation list at each (t): ({(y_t^0,\tilde F_t,\sigma_0^2)}\cup{(z_{jt},\tilde F_t+(\delta^j\text{-block }F_t),\sigma_j^2)}*{j=1}^J).
+  Draw
+  [
+  x*{0:T}^{(s)} \sim p(x_{0:T}\mid y^0_{1:T},z_{1:J,1:T},\Theta^{(s-1)})
+  ]
+  via FFBS with sequential assimilation.
+
+  **(B-blocked)**
+  (i) Draw (\alpha_{0:T}^{(s)} \sim p(\alpha_{0:T}\mid y^0_{1:T},z_{1:J,1:T},\delta_{0:T}^{1:J,(s-1)},\Theta^{(s-1)})) via FFBS.
+  (ii) For each (j=1,\dots,J), draw
+  [
+  \delta_{0:T}^{j,(s)} \sim p(\delta_{0:T}^j \mid z_{j,1:T},\alpha_{0:T}^{(s)},\Theta^{(s-1)})
+  ]
+  via FFBS (state dimension (q)).
+
+* **Model C (forecast period; conditional convention):**
+  Given a prior (\beta_T\sim N(m_T^\beta,C_T^\beta)), draw
+  [
+  \beta_{T:T+K}^{(s)} \sim p(\beta_{T:T+K}\mid {y_T^{j,i}(k)},\Theta^{(s-1)})
+  ]
+  via FFBS, assimilating all ensemble-member observations at each (t=T+k) sequentially.
+
+**(2) Observation variance updates** (all IG; Section 4.1)
+
+Compute SSEs using the newly drawn states and update independently for each (j):
+[
+\sigma_j^{2,(s)} \sim \mathrm{IG}!\left(a_{\sigma j}+\frac{N_j}{2},\ b_{\sigma j}+\frac{\mathrm{SSE}_j}{2}\right).
+]
+
+**(3) Evolution covariance updates** (IW/IG; Section 4.2)
+
+For each learned covariance block (W_b\in\mathcal{W}): compute innovations (u_t) from the newly drawn state path(s) and draw
+[
+W_b^{(s)} \sim \mathrm{IW}!\left(\nu_b + T_b,\ S_b + \sum_{t\in\mathcal{T}_b} u_t u_t^\top\right),
+]
+or the scalar IG analogue.
+(If a block is fixed by discounting, skip.)
+
+**(4) Transfer coefficient (\lambda)** (optional; Section 4.3)
+
+If (\lambda) is random:
+[
+\lambda^{(s)} \sim N(m_{\lambda\mid},s_{\lambda\mid}^2)
+\quad\text{(or truncated to }(-1,1)\text{)}.
+]
+If fixed, skip.
+
+**(5) Store draws** if (s>S_0) and ((s-S_0)\bmod L=0).
+
+---
+
+### 5.4 Implementation details that matter for correctness
+
+1. **Sequential assimilation at each time** (especially Model C)
+   Use the scalar-update filter in Section 3.3 to assimilate (n_t) observations without forming an (n_t\times n_t) covariance matrix.
+
+2. **Missingness**
+   Skip missing observations in the likelihood and in SSE counts (N_j).
+
+3. **Coupling between Model B and Model C**
+   If you later choose a *fully joint* sampler across historical+forecast, replace the conditional Model C step by an FFBS draw on a single time-extended state that changes dimension at (t=T). The conditional convention (Model C given (\beta_T\sim N(m_T^\beta,C_T^\beta))) is typically cleaner and matches the “forecast-stage” separation.
+
+---
+
+### 5.5 Computational complexity (per MCMC iteration)
+
+Let (d) denote the state dimension in the FFBS call and (n_t) the number of scalar observations assimilated at time (t).
+
+* **Filtering + smoothing (FFBS)**
+
+  * Prediction step costs (O(d^3)) per time in the generic dense case (matrix–matrix multiply and Cholesky/inversion for (R_t)).
+  * Each scalar assimilation costs (O(d^2)).
+    Total (generic):
+    [
+    O\Big((t_1-t_0),d^3 + \sum_t n_t d^2\Big).
+    ]
+    In practice, your (G_t,W_t) are block-diagonal or sparse; exploiting block structure reduces the effective (d^3) term to a sum over blocks.
+
+* **Model B dimension**
+  (d_B=(q+1+m)+Jq). If (J) is moderate and (q) small, (B-joint) is feasible; otherwise (B-blocked) reduces FFBS dimension to (q+1+m) for (\alpha) plus (q) per discrepancy.
+
+* **Variance/covariance updates**
+
+  * (\sigma_j^2): (O(N_j)) to compute SSEs (often dominated by storage/IO).
+  * IW updates: (O(T,d_b^2)) to accumulate (\sum u_tu_t^\top) for a (d_b\times d_b) block, plus the IW draw cost (O(d_b^3)) for Cholesky.
+
+---
+
+### Dependencies
+
+* Section 3: Kalman filter with sequential scalar assimilation; FFBS / simulation smoothing formulas.
+* Section 4: IG full conditionals for (\sigma_j^2); IW/IG full conditionals for evolution covariances; Normal (or truncated Normal) full conditional for (\lambda).
+---------
+
+## Section 6 — Mean-field VB (CAVI) for the Gaussian model
+
+### 6.1 Mean-field factorization
+
+Let (\mathcal{D}) denote the data for the chosen model (A/B/C or their combination). Partition latent trajectories into the relevant state path(s), and let (\Theta=({\sigma_j^2},\lambda,\mathcal{W})) denote static parameters (with (\mathcal{W}) the set of learned evolution-covariance blocks; omit any that are fixed by discount factors).
+
+A default mean-field family mirroring the original architecture (but without exAL latents) is
+[
+\boxed{
+q(\text{states},\Theta)
+=======================
+
+q(\text{states});
+\Big[\prod_{j=0}^{J} q(\sigma_j^2)\Big];
+\Big[\prod_{b\in\mathcal{B}} q(W_b)\Big];
+q(\lambda),
+}
+]
+where:
+
+* “states” means (\alpha_{0:T}) for Model A, the stacked (x_{0:T}=(\alpha_{0:T},\delta^{1:J}*{0:T})) for Model B, and/or (\beta*{T:T+K}) for Model C.
+* (\mathcal{B}) indexes the covariance blocks you treat as unknown (e.g., (W^\theta, W^\psi, W^{\delta j}, W^\beta), scalar (w^\zeta), etc.). Use IG rather than IW for scalar blocks.
+
+---
+
+### 6.2 Coordinate update for (q(\text{states})): Gaussian smoothing with expected precisions
+
+#### Proposition 6.1 (Gaussian variational state factor)
+
+Under the mean-field factorization above, the optimal (q(\text{states})) is Gaussian on the full trajectory and can be computed via a Kalman filter / RTS smoother (or FFBS moments) on a **pseudo** linear–Gaussian model where observation and evolution **precisions** are replaced by their current variational expectations.
+
+---
+
+#### 6.2.1 Generic pseudo model for sequential assimilation
+
+Use the scalar-observation representation from Section 3:
+[
+y_{t,n}\mid x_t \sim N(h_{t,n}^\top x_t,\ r_{t,n}),
+\qquad
+x_t\mid x_{t-1}\sim N(G_t x_{t-1}, W_t).
+]
+
+In VB, the expected log joint contributing to the quadratic form in (x) contains
+[
+-\tfrac12 \mathbb{E}*q[r*{t,n}^{-1}], (y_{t,n}-h_{t,n}^\top x_t)^2
+\quad\text{and}\quad
+-\tfrac12 (x_t-G_t x_{t-1})^\top \mathbb{E}*q[W_t^{-1}],(x_t-G_t x*{t-1}).
+]
+Therefore define **effective** variances/covariances:
+[
+\boxed{
+\tilde r_{t,n} := \big(\mathbb{E}*q[r*{t,n}^{-1}]\big)^{-1},
+\qquad
+\tilde W_t := \big(\mathbb{E}*q[W_t^{-1}]\big)^{-1}.
+}
+]
+Then the optimal (q(x*{t_0:t_1})) is the exact smoothing distribution of the same state-space model with ((r_{t,n},W_t)) replaced by ((\tilde r_{t,n},\tilde W_t)).
+
+**Implementation:** run the **same** sequential-assimilation Kalman filter and smoother as Section 3, but use (\tilde r_{t,n}) and (\tilde W_t). This returns:
+[
+\boxed{
+m_t := \mathbb{E}_q[x_t],\qquad
+C_t := \mathrm{Var}*q(x_t),\qquad
+C*{t,t-1}:=\mathrm{Cov}*q(x_t,x*{t-1}).
+}
+]
+(These three moment objects are the sufficient output needed for all other VB updates.)
+
+---
+
+#### 6.2.2 Required expectations (closed form)
+
+* If (q(\sigma_j^2)=\mathrm{IG}(a_j,b_j)), then
+  [
+  \boxed{
+  \mathbb{E}_q[(\sigma_j^2)^{-1}] = \frac{a_j}{b_j},
+  \qquad
+  \mathbb{E}_q[\log \sigma_j^2] = \log b_j - \psi(a_j),
+  }
+  ]
+  with (\psi(\cdot)) the digamma function.
+
+* If (q(W_b)=\mathrm{IW}(\nu_b,S_b)) (dimension (d_b)) under the convention
+  (p(W)\propto |W|^{-(\nu_b+d_b+1)/2}\exp{-\tfrac12\mathrm{tr}(S_b W^{-1})}), then
+  [
+  \boxed{
+  \mathbb{E}_q[W_b^{-1}] = \nu_b, S_b^{-1},
+  \qquad
+  \tilde W_b = (\mathbb{E}_q[W_b^{-1}])^{-1} = \frac{1}{\nu_b}, S_b.
+  }
+  ]
+
+* If (q(\lambda)=N(m_\lambda,v_\lambda)), then
+  [
+  \boxed{
+  \mathbb{E}*q[\lambda]=m*\lambda,\qquad
+  \mathbb{E}*q[\lambda^2]=m*\lambda^2+v_\lambda.
+  }
+  ]
+
+---
+
+### 6.3 Coordinate updates for (q(\sigma_j^2)): inverse-gamma with expected SSE
+
+Assume the variational family
+[
+q(\sigma_j^2)=\mathrm{IG}(a_j,b_j),\qquad j=0,\dots,J,
+]
+and prior (\sigma_j^2\sim \mathrm{IG}(a_{\sigma j},b_{\sigma j})).
+
+Let (\mathcal{I}*j) be the index set of all scalar observations governed by (\sigma_j^2) (historical + retrospective + forecast as in Section 4.1). Each such observation has the form
+[
+y*{n} = h_{n}^\top x_{t(n)} + \varepsilon_n,\qquad \varepsilon_n\sim N(0,\sigma_j^2).
+]
+
+Define the expected squared residual for an observation ((y_n,h_n,t)):
+[
+\boxed{
+\mathbb{E}_q!\big[(y_n-h_n^\top x_t)^2\big]
+===========================================
+
+\big(y_n-h_n^\top m_t\big)^2 + h_n^\top C_t, h_n.
+}
+]
+Then define the expected SSE:
+[
+\boxed{
+\mathbb{E}*q[\mathrm{SSE}*j]
+:= \sum*{n\in\mathcal{I}*j}
+\left{
+\big(y_n-h_n^\top m*{t(n)}\big)^2 + h_n^\top C*{t(n)} h_n
+\right}.
+}
+]
+
+The coordinate update is:
+[
+\boxed{
+a_j \leftarrow a_{\sigma j} + \frac{|\mathcal{I}*j|}{2},
+\qquad
+b_j \leftarrow b*{\sigma j} + \frac{1}{2},\mathbb{E}_q[\mathrm{SSE}_j].
+}
+]
+
+**Specialization to your three data types**
+
+* Target: (h=\tilde F_t), (x_t=\alpha_t), (y=y_t^0).
+* Retrospective (z_{jt}): (h=) the stacked selector placing (\tilde F_t) on (\alpha_t) and (F_t) on (\delta_t^j).
+* Forecast member (y_T^{j,i}(k)): (h=e_{T+k,j}), (x_t=\beta_{T+k}).
+
+---
+
+### 6.4 Coordinate updates for evolution covariances (q(W_b)): inverse-Wishart with expected innovation scatter
+
+Assume a block (b) corresponds to a (d_b)-dimensional transition component
+[
+x_t^{(b)} \mid x_{t-1}^{(b)} \sim N(G_t^{(b)} x_{t-1}^{(b)}, W_b),
+\qquad
+W_b \sim \mathrm{IW}(\nu_{0b},S_{0b}),
+]
+time-constant (W_b). (If discount-factor fixed: skip this entire block.)
+
+Let (\mathcal{T}_b) be the set of time indices included in that evolution (e.g., ({1,\dots,T}) for historical components; ({T+1,\dots,T+K}) for forecast-only).
+
+Define innovations (u_t^{(b)} := x_t^{(b)} - G_t^{(b)} x_{t-1}^{(b)}). The optimal (q(W_b)) is
+[
+\boxed{
+q(W_b)=\mathrm{IW}(\nu_b,S_b),
+\qquad
+\nu_b \leftarrow \nu_{0b} + |\mathcal{T}*b|,
+\qquad
+S_b \leftarrow S*{0b} + \sum_{t\in\mathcal{T}_b}\mathbb{E}_q[u_t^{(b)}(u_t^{(b)})^\top].
+}
+]
+
+Compute (\mathbb{E}*q[u_t u_t^\top]) from smoothed moments. Let
+[
+M_t := \mathbb{E}*q[x_t]=m_t,\quad
+P_t := \mathbb{E}*q[x_t x_t^\top]=C_t+m_t m_t^\top,\quad
+P*{t,t-1}:=\mathbb{E}*q[x_t x*{t-1}^\top]=C*{t,t-1}+m_t m*{t-1}^\top.
+]
+Then
+[
+\boxed{
+\mathbb{E}_q[u_t u_t^\top]
+==========================
+
+P_t
+
+* G_t P_{t-1,t}
+* P_{t,t-1} G_t^\top
+
+- G_t P_{t-1} G_t^\top,
+  }
+  ]
+  with (P_{t-1,t}=P_{t,t-1}^\top).
+
+**Scalar evolution variance (e.g., (w^\zeta))**
+If (w^\zeta\sim \mathrm{IG}(a_\zeta,b_\zeta)) and (\zeta_t-\lambda\zeta_{t-1}-x_t^\top\psi_t) is the innovation, then
+[
+\boxed{
+q(w^\zeta)=\mathrm{IG}(a_\zeta^\star,b_\zeta^\star),
+\quad
+a_\zeta^\star \leftarrow a_\zeta+\frac{T}{2},
+\quad
+b_\zeta^\star \leftarrow b_\zeta + \frac12 \sum_{t=1}^T \mathbb{E}_q[(u_t^\zeta)^2],
+}
+]
+and (\mathbb{E}_q[(u_t^\zeta)^2]) is computed analogously using means/variances of the scalar (u_t^\zeta).
+
+---
+
+### 6.5 Coordinate update for (q(\lambda)): conjugate Normal (optional)
+
+Assume (\lambda\sim N(m_{\lambda 0},s_{\lambda 0}^2)), and the transfer evolution
+[
+\zeta_t = \lambda \zeta_{t-1} + x_t^\top\psi_t + \eta_t,\qquad \eta_t\sim N(0,w^\zeta),
+]
+with (w^\zeta) either fixed or having variational factor (q(w^\zeta)).
+
+Define (y_t^\lambda := \zeta_t - x_t^\top \psi_t). Under mean-field, the optimal (q(\lambda)=N(m_\lambda,v_\lambda)) satisfies
+[
+\boxed{
+v_\lambda^{-1}
+\leftarrow
+s_{\lambda 0}^{-2} + \mathbb{E}*q[(w^\zeta)^{-1}], \sum*{t=1}^T \mathbb{E}*q[\zeta*{t-1}^2],
+}
+]
+[
+\boxed{
+m_\lambda
+\leftarrow
+v_\lambda\left(
+s_{\lambda 0}^{-2} m_{\lambda 0}
++
+\mathbb{E}*q[(w^\zeta)^{-1}],
+\sum*{t=1}^T \mathbb{E}*q[\zeta*{t-1} y_t^\lambda]
+\right).
+}
+]
+All expectations are computable from the smoothed moments of ((\zeta_t,\psi_t)):
+[
+\mathbb{E}*q[\zeta*{t-1}^2]=\mathrm{Var}*q(\zeta*{t-1})+(\mathbb{E}*q[\zeta*{t-1}])^2,
+]
+and similarly
+[
+\mathbb{E}*q[\zeta*{t-1} y_t^\lambda]
+=====================================
+
+## \mathbb{E}*q[\zeta*{t-1}\zeta_t]
+
+\mathbb{E}*q[\zeta*{t-1} x_t^\top\psi_t],
+]
+where (\mathbb{E}*q[\zeta*{t-1}\zeta_t]) and cross-moments with (\psi_t) come from (C_{t,t-1}) and within-time covariances.
+
+(If you enforce (|\lambda|<1) in VB, either keep (q(\lambda)) unconstrained and post-check, or use a transformed parameter; the conjugate Normal update above is the clean default.)
+
+---
+
+### 6.6 VB-CAVI algorithm (implementation pseudocode)
+
+#### Algorithm 6.1 (CAVI; Gaussian N-DQLM)
+
+Initialize (q(\sigma_j^2), q(W_b), q(\lambda)). Repeat until convergence (ELBO change small, or max iterations):
+
+1. **Update (q(\text{states}))**: run Kalman smoother on the relevant state-space (Model A/B/C) using
+   (\tilde r_{t,n}=(\mathbb{E}*q[r*{t,n}^{-1}])^{-1}) and (\tilde W_t=(\mathbb{E}*q[W_t^{-1}])^{-1}).
+   Store ({m_t,C_t,C*{t,t-1}}).
+
+2. **Update each (q(\sigma_j^2))**: set ((a_j,b_j)) using Section 6.3 expected SSE.
+
+3. **Update each (q(W_b))** (and scalar IG blocks): set ((\nu_b,S_b)) using Section 6.4 expected innovation scatter.
+
+4. **Update (q(\lambda))** (if used): set ((m_\lambda,v_\lambda)) using Section 6.5.
+
+Return variational posterior summaries and required expectations.
+
+---
+
+### 6.7 Expectations checklist (minimal set to implement all updates)
+
+From current variational factors:
+[
+\boxed{
+\mathbb{E}_q[(\sigma_j^2)^{-1}],\ \mathbb{E}_q[\log \sigma_j^2]\ (j=0,\dots,J);
+\qquad
+\mathbb{E}_q[W_b^{-1}],\ \mathbb{E}_q[\log|W_b|]\ (b\in\mathcal{B});
+\qquad
+\mathbb{E}_q[\lambda],\ \mathbb{E}_q[\lambda^2].
+}
+]
+From the smoother output:
+[
+\boxed{
+m_t=\mathbb{E}*q[x_t],\quad
+C_t=\mathrm{Var}*q(x_t),\quad
+C*{t,t-1}=\mathrm{Cov}*q(x_t,x*{t-1})
+\quad\Rightarrow\quad
+P_t,\ P*{t,t-1}\ \text{as defined in Section 6.4}.
+}
+]
+
+---
+
+### Dependencies
+
+* Section 1: observation means and state definitions for Models A/B/C.
+* Section 3: sequential-assimilation Kalman filter and smoothing machinery (used here with effective variances (\tilde r,\tilde W)).
+* Section 4: conjugate forms motivating IG/IW/Normal variational families and sufficient-statistic structure.
+--------
+## Section 7 — ELBO (computable trace / logdet forms)
+
+### 7.1 Definition and decomposition
+
+Let the variational family be
+[
+q(\text{states},\Theta)=q(\text{states})\Big[\prod_{j=0}^J q(\sigma_j^2)\Big]\Big[\prod_{b\in\mathcal{B}}q(W_b)\Big]q(\lambda),
+]
+with (q(\sigma_j^2)=\mathrm{IG}(a_j,b_j)), (q(W_b)=\mathrm{IW}(\nu_b,S_b)) for matrix blocks (and IG for scalar blocks), and (q(\lambda)=N(m_\lambda,v_\lambda)) (if used).
+
+The ELBO is
+[
+\boxed{
+\mathcal{L}(q)
+==============
+
+## \mathbb{E}_q!\left[\log p(\mathcal{D},\text{states},\Theta)\right]
+
+\mathbb{E}_q!\left[\log q(\text{states},\Theta)\right].
+}
+]
+Decompose
+[
+\boxed{
+\mathcal{L}(q)
+==============
+
+\underbrace{\mathcal{L}*{\text{like}}}*{\text{all Gaussian obs}}
++
+\underbrace{\mathcal{L}*{\text{trans}}}*{\text{state evolutions}}
++
+\underbrace{\mathcal{L}*{\text{init}}}*{\text{initial states}}
++
+\underbrace{\mathcal{L}*{\text{priors}}}*{\sigma^2,W,\lambda\text{ priors}}
++
+\underbrace{\mathcal{H}*{\text{states}}+\mathcal{H}*{\sigma^2}+\mathcal{H}*{W}+\mathcal{H}*{\lambda}}_{\text{entropies}}.
+}
+]
+All terms below are explicit in terms of:
+
+* smoother moments (m_t=\mathbb{E}_q[x_t]), (C_t=\mathrm{Var}*q(x_t)), (C*{t,t-1}=\mathrm{Cov}*q(x_t,x*{t-1}));
+* (\mathbb{E}_q[(\sigma_j^2)^{-1}]=a_j/b_j), (\mathbb{E}_q[\log \sigma_j^2]=\log b_j-\psi(a_j));
+* (\mathbb{E}_q[W_b^{-1}]=\nu_b S_b^{-1}), and (\mathbb{E}_q[\log|W_b|]) (formula in §7.4.2).
+
+If some parameters are fixed (e.g., (\lambda), some (W_b)), drop the corresponding prior/entropy terms and replace expectations by constants.
+
+---
+
+### 7.2 Likelihood term (\mathcal{L}_{\text{like}})
+
+Use the scalar-observation list representation (Section 3): for each time (t) and observation (n),
+[
+y_{t,n}\mid x_t,r_{t,n}\sim N(h_{t,n}^\top x_t,\ r_{t,n}),
+\qquad r_{t,n}=\sigma_{j(t,n)}^2.
+]
+Then
+[
+\log p(y_{t,n}\mid x_t,\sigma_{j}^2)
+====================================
+
+-\tfrac12\Big(\log(2\pi)+\log \sigma_j^2 + \frac{(y_{t,n}-h_{t,n}^\top x_t)^2}{\sigma_j^2}\Big).
+]
+
+Define the expected squared residual (implementation-ready):
+[
+\boxed{
+\mathbb{E}*q[(y*{t,n}-h_{t,n}^\top x_t)^2]
+==========================================
+
+(y_{t,n}-h_{t,n}^\top m_t)^2 + h_{t,n}^\top C_t h_{t,n}.
+}
+]
+Group by variance index (j). Let (\mathcal{I}*j) be the set of all ((t,n)) such that (r*{t,n}=\sigma_j^2), and define
+[
+N_j:=|\mathcal{I}*j|,
+\qquad
+\mathbb{E}*q[\mathrm{SSE}*j]
+:=\sum*{(t,n)\in\mathcal{I}*j}\Big{(y*{t,n}-h*{t,n}^\top m_t)^2 + h*{t,n}^\top C_t h_{t,n}\Big}.
+]
+Then
+[
+\boxed{
+\mathcal{L}_{\text{like}}
+=========================
+
+-\frac12\sum_{j=0}^J
+\left[
+N_j\log(2\pi)
+
+* N_j,\mathbb{E}_q[\log \sigma_j^2]
+* \mathbb{E}_q[(\sigma_j^2)^{-1}],\mathbb{E}_q[\mathrm{SSE}_j]
+  \right].
+  }
+  ]
+
+---
+
+### 7.3 Transition term (\mathcal{L}_{\text{trans}})
+
+Treat each evolution block (b\in\mathcal{B}) as
+[
+x_t^{(b)}\mid x_{t-1}^{(b)},W_b \sim N(G_t^{(b)}x_{t-1}^{(b)},,W_b),
+\qquad t\in\mathcal{T}_b,
+]
+with (d_b=\dim(x_t^{(b)})).
+
+For a given (b), define innovations (u_t^{(b)}:=x_t^{(b)}-G_t^{(b)}x_{t-1}^{(b)}). Let
+[
+\mathbb{E}_q[u_t^{(b)}(u_t^{(b)})^\top]
+]
+be computed from smoother moments via the identity (Section 6.4):
+[
+\boxed{
+\mathbb{E}_q[u_t u_t^\top]
+==========================
+
+P_t - G_t P_{t-1,t} - P_{t,t-1}G_t^\top + G_t P_{t-1}G_t^\top,
+}
+]
+with (P_t=C_t+m_tm_t^\top) and (P_{t,t-1}=C_{t,t-1}+m_tm_{t-1}^\top), applied to the corresponding sub-block.
+
+Then the expected log transition density is
+[
+\boxed{
+\mathcal{L}_{\text{trans}}
+==========================
+
+-\frac12\sum_{b\in\mathcal{B}}
+\left[
+|\mathcal{T}_b|, d_b \log(2\pi)
++
+|\mathcal{T}_b|,\mathbb{E}*q[\log|W_b|]
++
+\sum*{t\in\mathcal{T}_b}
+\mathrm{tr}!\left(
+\mathbb{E}_q[W_b^{-1}],\mathbb{E}_q[u_t^{(b)}(u_t^{(b)})^\top]
+\right)
+\right].
+}
+]
+(For scalar (w^\zeta), replace (\log|W_b|) by (\log w^\zeta), and the trace term by (\mathbb{E}_q[(w^\zeta)^{-1}]\mathbb{E}_q[(u_t^\zeta)^2]).)
+
+If a block covariance is fixed by discounting, treat (\mathbb{E}_q[\log|W_b|]) and (\mathbb{E}_q[W_b^{-1}]) as constants and omit its (q(W_b)) entropy/prior terms.
+
+---
+
+### 7.4 Initial-state and prior terms
+
+#### 7.4.1 Initial states (\mathcal{L}_{\text{init}})
+
+For any Gaussian initial prior (x_{t_0}\sim N(m_0,C_0)) (this covers (\alpha_0), each (\delta_0^j), and optionally (\beta_T)), with (q(x_{t_0})) marginal (N(m_{t_0},C_{t_0})),
+[
+\boxed{
+\mathbb{E}*q[\log p(x*{t_0})]
+=============================
+
+-\frac12\left[
+d\log(2\pi)+\log|C_0|
++\mathrm{tr}(C_0^{-1}C_{t_0})
++(m_{t_0}-m_0)^\top C_0^{-1}(m_{t_0}-m_0)
+\right],
+}
+]
+where (d=\dim(x_{t_0})). Sum these contributions over all initial-state priors used by your chosen model partition.
+
+#### 7.4.2 Priors on (\sigma_j^2), (W_b), (\lambda)
+
+**(i) IG prior for (\sigma_j^2)**
+With (\sigma_j^2\sim \mathrm{IG}(a_{\sigma j},b_{\sigma j})) and (q(\sigma_j^2)=\mathrm{IG}(a_j,b_j)),
+[
+\boxed{
+\mathbb{E}_q[\log p(\sigma_j^2)]
+================================
+
+a_{\sigma j}\log b_{\sigma j} - \log\Gamma(a_{\sigma j})
+-(a_{\sigma j}+1),\mathbb{E}_q[\log\sigma_j^2]
+
+* b_{\sigma j},\mathbb{E}_q[(\sigma_j^2)^{-1}].
+  }
+  ]
+
+**(ii) IW prior for (W_b)**
+Use the parameterization (W_b\sim \mathrm{IW}(\nu_{0b},S_{0b})) with density
+[
+\log p(W_b)
+===========
+
+c(\nu_{0b},S_{0b})
+-\frac{\nu_{0b}+d_b+1}{2}\log|W_b|
+-\frac12\mathrm{tr}(S_{0b}W_b^{-1}),
+]
+where (c(\cdot)) is the normalizing constant. Then
+[
+\boxed{
+\mathbb{E}_q[\log p(W_b)]
+=========================
+
+c(\nu_{0b},S_{0b})
+-\frac{\nu_{0b}+d_b+1}{2},\mathbb{E}*q[\log|W_b|]
+-\frac12,\mathrm{tr}!\left(S*{0b},\mathbb{E}_q[W_b^{-1}]\right).
+}
+]
+Closed-form expectations under (q(W_b)=\mathrm{IW}(\nu_b,S_b)):
+[
+\boxed{
+\mathbb{E}_q[W_b^{-1}] = \nu_b S_b^{-1},
+}
+]
+[
+\boxed{
+\mathbb{E}_q[\log|W_b|]
+=======================
+
+\log|S_b|
+-\sum_{i=1}^{d_b}\psi!\left(\frac{\nu_b+1-i}{2}\right)
+-d_b\log 2.
+}
+]
+Normalizing constant:
+[
+c(\nu,S)
+========
+
+\frac{\nu}{2}\log|S|
+-\frac{\nu d}{2}\log 2
+-\log \Gamma_d!\left(\frac{\nu}{2}\right),
+]
+where (\Gamma_d(\cdot)) is the multivariate gamma.
+
+**(iii) Normal prior for (\lambda)**
+If (\lambda\sim N(m_{\lambda0},s_{\lambda0}^2)) and (q(\lambda)=N(m_\lambda,v_\lambda)),
+[
+\boxed{
+\mathbb{E}_q[\log p(\lambda)]
+=============================
+
+-\frac12\left[
+\log(2\pi s_{\lambda0}^2)
++\frac{v_\lambda+(m_\lambda-m_{\lambda0})^2}{s_{\lambda0}^2}
+\right].
+}
+]
+(If (\lambda) is fixed: omit. If truncated: the prior constant changes by (-\log\Pr(|Z|<1)) under the unconstrained Normal; include only if you explicitly implement truncation.)
+
+---
+
+### 7.5 Entropy terms
+
+#### 7.5.1 Entropy of (q(\sigma_j^2)) (IG)
+
+Rather than using a standalone entropy formula, compute (\mathcal{H}*{\sigma^2}) via
+[
+\boxed{
+\mathcal{H}*{\sigma^2}
+======================
+
+-\sum_{j=0}^J \mathbb{E}_q[\log q(\sigma_j^2)],
+}
+]
+with
+[
+\boxed{
+\mathbb{E}_q[\log q(\sigma_j^2)]
+================================
+
+a_j\log b_j - \log\Gamma(a_j)
+-(a_j+1),\mathbb{E}_q[\log\sigma_j^2]
+
+* b_j,\mathbb{E}_q[(\sigma_j^2)^{-1}],
+  }
+  ]
+  and (\mathbb{E}_q[\log\sigma_j^2]=\log b_j-\psi(a_j)), (\mathbb{E}_q[(\sigma_j^2)^{-1}]=a_j/b_j).
+
+#### 7.5.2 Entropy of (q(W_b)) (IW)
+
+Similarly,
+[
+\boxed{
+\mathcal{H}*W = -\sum*{b\in\mathcal{B}} \mathbb{E}_q[\log q(W_b)],
+}
+]
+and for (q(W_b)=\mathrm{IW}(\nu_b,S_b)),
+[
+\boxed{
+\mathbb{E}_q[\log q(W_b)]
+=========================
+
+c(\nu_b,S_b)
+-\frac{\nu_b+d_b+1}{2},\mathbb{E}_q[\log|W_b|]
+-\frac12,\mathrm{tr}!\left(S_b,\mathbb{E}_q[W_b^{-1}]\right),
+}
+]
+with the expectations in §7.4.2.
+
+#### 7.5.3 Entropy of (q(\lambda)) (Normal)
+
+If (q(\lambda)=N(m_\lambda,v_\lambda)),
+[
+\boxed{
+\mathcal{H}*\lambda = \frac12\log(2\pi e,v*\lambda),
+\qquad
+\text{equivalently }-\mathbb{E}_q[\log q(\lambda)].
+}
+]
+
+#### 7.5.4 Entropy of (q(\text{states})) (Gaussian trajectory)
+
+Let (x) denote the stacked trajectory vector (dimension (n=d(T^\star+1)) for a segment of length (T^\star), state dimension (d)). Since (q(\text{states})) is multivariate Normal,
+[
+\boxed{
+\mathcal{H}_{\text{states}}
+===========================
+
+\frac12\left[n\log(2\pi e)+\log|\Sigma_q|\right].
+}
+]
+To compute (\log|\Sigma_q|) efficiently, use the block-tridiagonal precision (J_q=\Sigma_q^{-1}) and
+[
+\boxed{
+\log|\Sigma_q| = -\log|J_q|.
+}
+]
+A computable construction of (J_q) (for a fixed state segment) is:
+
+* Define per-time observation precision and information:
+  [
+  \boxed{
+  S_t := \sum_{n=1}^{n_t}\tau_{t,n}, h_{t,n}h_{t,n}^\top,\qquad
+  b_t := \sum_{n=1}^{n_t}\tau_{t,n}, y_{t,n}h_{t,n},
+  }
+  \quad
+  \tau_{t,n}:=\mathbb{E}*q[r*{t,n}^{-1}] = \mathbb{E}*q[(\sigma*{j(t,n)}^2)^{-1}].
+  ]
+* Define transition precision blocks (Q_t:=\mathbb{E}_q[W_t^{-1}]) (blockwise from (q(W_b)); if (W_t) is block-diagonal, so is (Q_t)).
+* Define initial prior precision (P_0:=C_0^{-1}) (or omit if the segment starts from an induced Gaussian prior already included as (S_{t_0}) and (b_{t_0})).
+
+Then the block-tridiagonal precision for ((x_{t_0},\dots,x_{t_1})) has blocks:
+[
+\boxed{
+J_{t,t}=S_t + Q_t + G_{t+1}^\top Q_{t+1}G_{t+1}\ \ (t_0<t<t_1),
+}
+]
+[
+\boxed{
+J_{t,t-1}=-Q_t G_t,\qquad J_{t-1,t}=-G_t^\top Q_t\ \ (t_0<t\le t_1),
+}
+]
+with end corrections
+[
+\boxed{
+J_{t_0,t_0}=P_0+S_{t_0}+G_{t_0+1}^\top Q_{t_0+1}G_{t_0+1},\qquad
+J_{t_1,t_1}=S_{t_1}+Q_{t_1}.
+}
+]
+Compute (\log|J_q|) via **banded Cholesky** of the block-tridiagonal matrix (cost (O(T^\star d^3))); then
+[
+\boxed{
+\mathcal{H}*{\text{states}}=\frac12\left[n\log(2\pi e)-\log|J_q|\right].
+}
+]
+(If you factorize (q(\text{states})) across segments—e.g., (q(\alpha,\delta),q(\beta))—compute (\mathcal{H}*{\text{states}}) separately per segment and add.)
+
+---
+
+### 7.6 Final ELBO assembly (implementation checklist)
+
+Compute and sum:
+
+1. (\mathcal{L}_{\text{like}}) using (\mathbb{E}_q[\log\sigma_j^2]), (\mathbb{E}_q[(\sigma_j^2)^{-1}]), and (\mathbb{E}_q[\mathrm{SSE}_j]).
+2. (\mathcal{L}_{\text{trans}}) using (\mathbb{E}_q[\log|W_b|]), (\mathbb{E}_q[W_b^{-1}]), and expected innovation scatters from smoother moments.
+3. (\mathcal{L}_{\text{init}}) for each initial-state prior used.
+4. (\mathcal{L}_{\text{priors}}) for (\sigma_j^2), (W_b), (\lambda).
+5. Entropies (\mathcal{H}*{\sigma^2},\mathcal{H}*{W},\mathcal{H}*\lambda,\mathcal{H}*{\text{states}}).
+
+---
+
+### Dependencies
+
+* Section 3: state smoother moments (m_t,C_t,C_{t,t-1}).
+* Section 6: required expectations for ((\sigma_j^2)^{-1}), (\log\sigma_j^2), (W_b^{-1}), (\log|W_b|), and how to compute (\mathbb{E}_q[u_tu_t^\top]) and (\mathbb{E}_q[\mathrm{SSE}_j]).
+---------
+
+## Section 8 — Computational notes and validation checks
+
+This section consolidates implementation-critical details (for MCMC and VB) and a validation checklist to ensure the Gaussian N-DQLM document and code are internally consistent and reproducible.
+
+---
+
+### 8.1 Canonical “observation list” construction (single interface for A/B/C)
+
+All filtering/smoothing routines in Sections 3 and 6 can be driven by a common representation:
+
+[
+\boxed{
+\mathcal{O}*t := {(y*{t,n},, h_{t,n},, r_{t,n})}*{n=1}^{n_t},
+\qquad
+y*{t,n}\mid x_t \sim N(h_{t,n}^\top x_t,\ r_{t,n}).
+}
+]
+
+**Model A (historical target):**
+[
+\mathcal{O}_t = {(y_t^0,\ \tilde F_t,\ \sigma_0^2)}.
+]
+
+**Model B (historical + retrospective products), stacked state (x_t=(\alpha_t,\delta_t^1,\dots,\delta_t^J)):**
+[
+\mathcal{O}_t
+=============
+
+{(y_t^0,\ h_{t,0},\ \sigma_0^2)}
+\cup
+{(z_{jt},\ h_{t,j},\ \sigma_j^2)}*{j=1}^J,
+]
+where (h*{t,0}) places (\tilde F_t) on the (\alpha)-block and zeros elsewhere, and (h_{t,j}) places (\tilde F_t) on the (\alpha)-block and (F_t) on the (\delta^j)-block.
+
+**Model C (forecast ensembles), state (x_t=\beta_t):**
+At (t=T+k),
+[
+\mathcal{O}*{T+k}={(y_T^{j,i}(k),\ e*{T+k,j},\ \sigma_j^2)}_{j=1..J_f,\ i=1..I_j}.
+]
+
+**Missingness rule (global):** drop missing observations from (\mathcal{O}_t) (equivalently, skip their sequential assimilation step).
+
+---
+
+### 8.2 Sequential scalar assimilation (numerical stability + cost)
+
+For each ((y,h,r)\in\mathcal{O}_t), using current within-time moments ((m,C)), compute
+[
+q = h^\top C h + r,\quad A = C h/q,\quad e=y-h^\top m,
+]
+then update
+[
+\boxed{
+m \leftarrow m + A e,
+\qquad
+C \leftarrow C - A A^\top q.
+}
+]
+
+**Stability note:** implement the covariance update in a symmetry-preserving way, e.g.
+[
+C \leftarrow \tfrac12(C+C^\top)
+]
+after each time step (or after all (n_t) updates).
+
+**Cost:** for state dimension (d), each scalar assimilation is (O(d^2)); total at time (t) is (O(n_t d^2)), which is essential for large forecast ensembles.
+
+---
+
+### 8.3 Block structure exploitation (recommended)
+
+Many matrices are block-diagonal or block-sparse:
+
+* Model B stacked evolution often has block-diagonal (G_t^B) and (W_t^B).
+* Model C typically has block-diagonal (G_t^\beta) and (W_t^\beta) (repeated baseline/discrepancy blocks).
+
+**Implementation consequence:** do not form dense (d\times d) matrices if you can apply (G_t) and (W_t) blockwise; prediction
+[
+R_t=G_t C_{t-1} G_t^\top + W_t
+]
+can be computed using block operations.
+
+---
+
+### 8.4 SSE and innovation sums: compute once per iteration, in streaming form
+
+#### 8.4.1 Observation SSEs (MCMC) and expected SSEs (VB)
+
+For each observation ((y,h,r=\sigma_j^2)), define the residual:
+
+* **MCMC:** (e=y-h^\top x_t)
+* **VB:** (\mathbb{E}[e^2]=(y-h^\top m_t)^2+h^\top C_t h)
+
+Accumulate by source (j):
+[
+\boxed{
+\mathrm{SSE}_j ;{+}{=}; e^2
+\quad\text{(MCMC)},\qquad
+\mathbb{E}[\mathrm{SSE}_j];{+}{=};(y-h^\top m_t)^2+h^\top C_t h
+\quad\text{(VB)}.
+}
+]
+
+Also increment counts (N_j) (number of observations governed by (\sigma_j^2)). This enforces the invariant mapping (j\mapsto\sigma_j^2) across all data sources.
+
+#### 8.4.2 Innovation scatter for IW updates (MCMC) and expected scatter (VB)
+
+For a block transition (x_t^{(b)}\sim N(G_t^{(b)}x_{t-1}^{(b)},W_b)), compute innovations:
+
+* **MCMC:** (u_t=x_t^{(b)}-G_t^{(b)}x_{t-1}^{(b)}), accumulate (\sum u_tu_t^\top).
+* **VB:** accumulate (\sum \mathbb{E}[u_tu_t^\top]) using
+  [
+  \boxed{
+  \mathbb{E}[u_tu_t^\top]
+  =
+  P_t - G_t P_{t-1,t} - P_{t,t-1}G_t^\top + G_t P_{t-1}G_t^\top,
+  }
+  ]
+  with (P_t=C_t+m_tm_t^\top), (P_{t,t-1}=C_{t,t-1}+m_tm_{t-1}^\top).
+
+---
+
+### 8.5 Cholesky-first implementation rules
+
+1. **Avoid explicit inverses.** Use linear solves with Cholesky factors for:
+
+* (R_{t+1}^{-1}) in FFBS gains (J_t=C_t G_{t+1}^\top R_{t+1}^{-1}),
+* IW expectations involving (S_b^{-1}).
+
+2. **Symmetry enforcement.** After updates and smoothing steps, enforce:
+   [
+   C \leftarrow \tfrac12(C+C^\top),
+   ]
+   and (optionally) jitter the diagonal if needed for Cholesky.
+
+3. **Positive-definiteness guards.**
+
+* If (q=h^\top C h + r\le 0) occurs, treat it as a numerical error: re-symmetrize (C), check (r>0), and apply a minimal diagonal jitter to (C).
+
+---
+
+### 8.6 VB convergence diagnostics
+
+Use at least one of:
+
+* ELBO monotonicity (Section 7): (\mathcal{L}^{(k)}) should not decrease under exact CAVI updates (numerical drift aside).
+* Relative parameter change:
+  [
+  \max_j \frac{|a_j^{(k)}-a_j^{(k-1)}|}{a_j^{(k-1)}}\ \text{and}\
+  \max_j \frac{|b_j^{(k)}-b_j^{(k-1)}|}{b_j^{(k-1)}}.
+  ]
+* Moment stability for key state components (e.g., (\theta_t) means and marginal variances).
+
+---
+
+### 8.7 Validation checklist (model reductions and invariants)
+
+#### 8.7.1 Reduction checks (must hold algebraically)
+
+1. **No retrospective products:** (J=0) reduces Model B to Model A.
+2. **No discrepancies:** set (\delta_t^j\equiv 0) and (W^{\delta j}=0), then (z_{jt}) collapses to baseline mean (\tilde F_t^\top\alpha_t).
+3. **No forecast stage:** removing Model C reduces to purely historical inference.
+4. **Simple DLM recovery:** remove (\zeta_t,\psi_t) (or set them constant) and recover a standard DLM for (\theta_t).
+
+#### 8.7.2 Probabilistic consistency checks
+
+* **Posterior predictive:** simulate replicated observations from the fitted model and compare:
+
+  * (y_t^{0,\text{rep}}) vs (y_t^0) (historical),
+  * (z_{jt}^{\text{rep}}) vs (z_{jt}),
+  * forecast ensemble summary statistics vs observed ensemble spread (when applicable).
+
+* **Variance mapping invariant:** verify programmatically that every observation assigned to (\sigma_j^2) in the likelihood is also assigned to the same (\sigma_j^2) in:
+
+  * the IG update (MCMC),
+  * the expected SSE and ELBO likelihood term (VB).
+
+#### 8.7.3 MCMC–VB cross-check (small synthetic)
+
+On a small synthetic instance (small (T), small (q), small (J), small (K)):
+
+* Run long MCMC, compute posterior means/variances of key blocks ((\theta_t), (\delta_t^j), (\sigma_j^2)).
+* Compare with VB:
+
+  * VB means should be close,
+  * VB variances should be smaller (mean-field under-dispersion), but not pathological.
+
+---
+
+### 8.8 Minimal “unit tests” implied by the derivations
+
+1. **Filter–smoother identity:** verify smoother means match filter means at final time.
+2. **FFBS correctness:** empirical mean/covariance of many FFBS draws should match smoother moments.
+3. **IG/IW updates:** posterior parameter updates reproduce closed-form posteriors on toy data where states are fixed/known.
+4. **ELBO finite and stable:** no NaNs; ELBO increases during CAVI iterations.
+
+---
+
+### Dependencies
+
+* Section 3: sequential assimilation, FFBS/smoother outputs.
+* Section 4: definitions of SSE/innovation sums and conjugate updates.
+* Section 6: expected SSE and expected innovation scatter formulas.
+* Section 7: ELBO terms and entropy computations (optional for VB convergence monitoring).
+------------
+## Section 9 — Posterior predictive distributions and forecast outputs (implementation-ready)
+
+This section gives the predictive distributions you will report/compute from either **MCMC draws** (Section 5) or **VB moments** (Section 6), for historical, retrospective, and forecast-ensemble settings, using the unified observation list ((y_{t,n},h_{t,n},r_{t,n})) (Section 8).
+
+---
+
+### 9.1 Conditional predictive at a fixed time (t) (generic)
+
+Let the relevant state at time (t) be (x_t) (this is (\alpha_t), the stacked ((\alpha_t,\delta_t^{1:J})), or (\beta_t), depending on A/B/C). For any scalar observation channel
+[
+y \mid x_t,\sigma^2 \sim N(h^\top x_t,\ \sigma^2),
+]
+the **conditional** predictive given ((x_t,\sigma^2)) is
+[
+\boxed{
+p(y\mid x_t,\sigma^2)=\phi!\left(y;\ h^\top x_t,\ \sigma^2\right).
+}
+]
+
+---
+
+### 9.2 One-step-ahead predictive from filtering (Kalman forecast)
+
+Suppose you have filtered moments at time (t):
+[
+x_t\mid \mathcal{D}*{1:t}\sim N(m_t,C_t),
+]
+and a transition model (x*{t+1}\mid x_t\sim N(G_{t+1}x_t,W_{t+1})).
+
+#### State forecast moments
+
+[
+\boxed{
+m_{t+1\mid t}=G_{t+1}m_t,\qquad
+C_{t+1\mid t}=G_{t+1}C_tG_{t+1}^\top + W_{t+1}.
+}
+]
+
+#### Observation forecast moments (conditional on (\sigma^2))
+
+For an observation (y_{t+1}\mid x_{t+1},\sigma^2\sim N(h_{t+1}^\top x_{t+1},\sigma^2)),
+[
+\boxed{
+\mathbb{E}[y_{t+1}\mid \mathcal{D}*{1:t},\sigma^2]=h*{t+1}^\top m_{t+1\mid t},
+}
+]
+[
+\boxed{
+\mathrm{Var}(y_{t+1}\mid \mathcal{D}*{1:t},\sigma^2)=h*{t+1}^\top C_{t+1\mid t}h_{t+1} + \sigma^2.
+}
+]
+This is the standard DLM forecast distribution conditional on (\sigma^2).
+
+---
+
+### 9.3 Posterior predictive using MCMC draws (exact Monte Carlo)
+
+Let ({x_t^{(s)},\sigma_{j}^{2,(s)}}_{s=1}^S) be posterior draws from Sections 3–5, with the observation using variance (\sigma_j^2).
+
+#### 9.3.1 Predictive sampling (at an existing time (t))
+
+For each draw (s),
+[
+\boxed{
+y^{\text{rep},(s)} \sim N(h^\top x_t^{(s)},\ \sigma_j^{2,(s)}).
+}
+]
+Then ({y^{\text{rep},(s)}}) approximates (p(y\mid \mathcal{D})). Point summaries:
+[
+\widehat{\mathbb{E}}[y\mid\mathcal{D}]=\frac1S\sum_{s=1}^S h^\top x_t^{(s)},
+\qquad
+\widehat{\mathrm{Var}}(y\mid\mathcal{D})
+=\frac1S\sum_{s=1}^S\Big(\sigma_j^{2,(s)} + (h^\top x_t^{(s)})^2\Big)-\widehat{\mathbb{E}}[y\mid\mathcal{D}]^2.
+]
+
+#### 9.3.2 Multi-step forecast sampling (forecast horizon)
+
+If you want (K)-step forecasts, then for each draw (s), simulate the state forward:
+[
+x_{t+1}^{(s)} \sim N(G_{t+1}x_t^{(s)},W_{t+1}^{(s)}),
+\quad \dots,\quad
+x_{t+K}^{(s)} \sim N(G_{t+K}x_{t+K-1}^{(s)},W_{t+K}^{(s)}),
+]
+and generate observations conditionally:
+[
+\boxed{
+y_{t+k}^{\text{rep},(s)} \sim N(h_{t+k}^\top x_{t+k}^{(s)},\ \sigma_j^{2,(s)}).
+}
+]
+This yields coherent predictive trajectories.
+
+---
+
+### 9.4 Posterior predictive using VB (Gaussian approximation)
+
+VB gives (q(x_t)=N(m_t,C_t)) and (q(\sigma_j^2)=\mathrm{IG}(a_j,b_j)). Because (\sigma_j^2) is random and (x_t) is random, the exact marginal (q)-predictive is a mixture; the clean default is to report **Gaussian predictive moments**.
+
+#### 9.4.1 Moment-matched Normal predictive (recommended)
+
+Define
+[
+\mu_{t}^{\text{VB}} := h^\top m_t,
+\qquad
+v_{t}^{\text{VB}} := h^\top C_t h + \mathbb{E}*q[\sigma_j^2],
+]
+where
+[
+\boxed{
+\mathbb{E}*q[\sigma_j^2]=\frac{b_j}{a_j-1}\quad (a_j>1).
+}
+]
+Then report
+[
+\boxed{
+y \mid \mathcal{D}\ \approx\ N(\mu*{t}^{\text{VB}},\ v*{t}^{\text{VB}}).
+}
+]
+
+If you prefer to use expected precision only (always well-defined), define an “effective” variance
+[
+\boxed{
+\tilde\sigma_j^2 := \big(\mathbb{E}*q[(\sigma_j^2)^{-1}]\big)^{-1}=\frac{b_j}{a_j},
+}
+]
+and use (v*{t}^{\text{VB}}:=h^\top C_t h + \tilde\sigma_j^2).
+
+#### 9.4.2 VB predictive for one-step-ahead forecasts
+
+Use the VB pseudo-forecast moments:
+[
+m_{t+1\mid t}=G_{t+1}m_t,\qquad
+C_{t+1\mid t}=G_{t+1}C_tG_{t+1}^\top + \tilde W_{t+1},
+]
+with (\tilde W_{t+1}=(\mathbb{E}*q[W*{t+1}^{-1}])^{-1}) (Section 6). Then:
+[
+\boxed{
+y_{t+1}\mid\mathcal{D}\ \approx\ N!\Big(h_{t+1}^\top m_{t+1\mid t},\ h_{t+1}^\top C_{t+1\mid t}h_{t+1}+\tilde\sigma_j^2\Big).
+}
+]
+
+---
+
+### 9.5 Specializations to your model components
+
+#### 9.5.1 Target series (historical)
+
+Use (x_t=\alpha_t), (h=\tilde F_t), variance (\sigma_0^2):
+[
+\boxed{
+y_t^0\mid \alpha_t,\sigma_0^2 \sim N(\tilde F_t^\top \alpha_t,\sigma_0^2).
+}
+]
+Predictive summaries follow by plugging ((h,\sigma_0^2)) into §§9.3–9.4.
+
+#### 9.5.2 Retrospective product (z_{jt})
+
+Use stacked (x_t=(\alpha_t,\delta_t^{1:J})) (or conditional blocks) and (h) that selects (\tilde F_t) and (F_t) for the (j)-th discrepancy:
+[
+\boxed{
+z_{jt}\mid x_t,\sigma_j^2 \sim N(h_{t,j}^\top x_t,\sigma_j^2),
+\qquad h_{t,j}^\top x_t=\tilde F_t^\top\alpha_t+F_t^\top\delta_t^j.
+}
+]
+
+#### 9.5.3 Forecast ensemble member (y_T^{j,i}(k))
+
+Use (x_{T+k}=\beta_{T+k}), (h=e_{T+k,j}), variance (\sigma_j^2):
+[
+\boxed{
+y_T^{j,i}(k)\mid \beta_{T+k},\sigma_j^2 \sim N(e_{T+k,j}^\top\beta_{T+k},\sigma_j^2).
+}
+]
+Posterior predictive for any ensemble summary (mean/spread/quantiles) is obtained by Monte Carlo over (s) (MCMC) or Normal approximation (VB) using the same (h).
+
+---
+
+### 9.6 Deliverables to report (matches “forecast correction/synthesis” outputs)
+
+For each forecast time (t=T+k) and each product (j):
+
+* Posterior for latent mean (m_{t}^{(j)}:=e_{t,j}^\top \beta_t) (MCMC draws or VB Normal (N(e^\top m_t,\ e^\top C_t e))).
+* Predictive distribution for an individual ensemble member observation:
+  [
+  N!\big(e_{t,j}^\top \beta_t,\ \sigma_j^2\big).
+  ]
+* Predictive distribution for a new replicate observation under the corrected model (using §§9.3–9.4).
+
+If you also want a “truth forecast” (y_{T+k}^0), decide which state representation you carry into the forecast period:
+
+* **Option (carry (\alpha) forward):** define (y_{T+k}^0\mid \alpha_{T+k},\sigma_0^2\sim N(\tilde F_{T+k}^\top\alpha_{T+k},\sigma_0^2)).
+* **Option (use (\theta)-block of (\beta)):** define (y_{T+k}^0\mid \theta_{T+k},\sigma_0^2\sim N(F_{T+k}^\top\theta_{T+k},\sigma_0^2)).
+
+Both are linear-Gaussian and fit the same machinery; choose the one consistent with your original `exDQLM___Ensemble.pdf` forecast-stage architecture.
+
+---
+
+### Dependencies
+
+* Section 3: filter/smoother recursions; multi-step state prediction.
+* Section 4: definitions of (\sigma_j^2) assignments by source (j).
+* Section 5: MCMC draws for predictive Monte Carlo.
+* Section 6: VB moments (m_t,C_t) and expectations (\mathbb{E}_q[\sigma_j^2]), ((\mathbb{E}_q[(\sigma_j^2)^{-1}])^{-1}), (\tilde W_t).
+* Section 8: observation list construction and scalar assimilation conventions.
+-------
+% ============================
+% Section 10 — Ensemble aggregation (sufficient-statistic assimilation)
+% ============================
+
+## Section 10 — Sufficient-statistic assimilation for replicated observations (ensemble aggregation)
+
+This section shows how to **exactly** assimilate many conditionally independent scalar observations that share the same
+design vector and variance (as in forecast ensembles), using only **sufficient statistics**. This reduces the per-time
+cost from \(O(n_t d^2)\) scalar updates to \(O(J_f d^2)\) updates (one per product), without changing the posterior.
+
+---
+
+### 10.1 Replicated Gaussian observations: likelihood depends on the sample mean only
+
+Fix a time \(t\) and a state \(x_t\in\mathbb{R}^d\). Suppose we observe \(n\) conditionally independent replicates
+\[
+y_i \mid x_t,\sigma^2 \;\sim\; N(h^\top x_t,\ \sigma^2),\qquad i=1,\dots,n,
+\]
+with common design vector \(h\in\mathbb{R}^d\) and common variance \(\sigma^2\).
+
+Define the sample mean and within-sample sum of squares
+\[
+\bar y := \frac{1}{n}\sum_{i=1}^n y_i,
+\qquad
+S_w := \sum_{i=1}^n (y_i-\bar y)^2.
+\]
+Then the quadratic term decomposes as
+\[
+\sum_{i=1}^n (y_i-h^\top x_t)^2
+=
+\underbrace{\sum_{i=1}^n (y_i-\bar y)^2}_{S_w}
++
+\underbrace{n(\bar y-h^\top x_t)^2}_{\text{depends on }x_t}.
+\]
+Hence, **conditional on \((\sigma^2,h)\)** the likelihood depends on \(x_t\) only through \(\bar y\), and we may replace
+the \(n\) replicates by the single aggregated observation
+\[
+\boxed{
+\bar y \mid x_t,\sigma^2 \;\sim\; N\!\left(h^\top x_t,\ \frac{\sigma^2}{n}\right),
+}
+\]
+up to a multiplicative factor that does not involve \(x_t\) (and therefore does not affect state filtering/smoothing).
+
+---
+
+### 10.2 Exact Kalman update using the aggregated observation
+
+Let the prior (prediction or within-time prior) be
+\[
+x_t \mid \mathcal{D} \sim N(m,\ C).
+\]
+Assimilating the \(n\) replicates sequentially with \((y_i,h,\sigma^2)\) yields the same posterior moments as
+assimilating \((\bar y,h,\sigma^2/n)\) once.
+
+**Aggregated scalar update:**
+\[
+q = h^\top C h + \frac{\sigma^2}{n},
+\qquad
+A = \frac{C h}{q},
+\qquad
+e = \bar y - h^\top m,
+\]
+\[
+\boxed{
+m \leftarrow m + A e,
+\qquad
+C \leftarrow C - A A^\top q.
+}
+\]
+
+**Information-form identity (useful for proofs/implementation checks):**
+If \(\tau:=\sigma^{-2}\), then the posterior precision and mean satisfy
+\[
+C_{\text{post}}^{-1} = C^{-1} + n\tau\, hh^\top,
+\qquad
+C_{\text{post}}^{-1} m_{\text{post}} = C^{-1}m + \tau\Big(\sum_{i=1}^n y_i\Big)h
+= C^{-1}m + n\tau\, \bar y\, h.
+\]
+This shows the posterior depends on the replicates only through \(\bar y\) and \(n\).
+
+---
+
+### 10.3 Variance updates (MCMC) using sufficient statistics
+
+For an IG update of \(\sigma^2\), the contribution to the SSE from these \(n\) observations is
+\[
+\mathrm{SSE} = \sum_{i=1}^n (y_i-h^\top x_t)^2 = S_w + n(\bar y-h^\top x_t)^2.
+\]
+Thus, for MCMC you can:
+- use the aggregated observation \((\bar y,\sigma^2/n)\) for the **state** update, and
+- add \(S_w\) plus the aggregated squared residual \(n(\bar y-h^\top x_t)^2\) to the **variance** SSE accumulator.
+
+Concretely, for source \(j\) at time \(t\), with \(h=h_{t,j}\) and mean \(\eta_{t,j}:=h_{t,j}^\top x_t\),
+\[
+\boxed{
+\mathrm{SSE}_j \;{+}{=}\; S_{w,t,j} \;+\; n_{t,j}\,(\bar y_{t,j}-\eta_{t,j})^2,
+\qquad
+N_j \;{+}{=}\; n_{t,j}.
+}
+\]
+This is algebraically identical to summing member-by-member residual squares.
+
+---
+
+### 10.4 Specialization to Model C (forecast ensembles)
+
+At forecast time \(t=T+k\), for each product \(j\in\{1,\dots,J_f\}\), you have members
+\[
+y_T^{j,i}(k)\mid \beta_{t},\sigma_j^2 \sim N(e_{t,j}^\top \beta_t,\ \sigma_j^2),
+\qquad i=1,\dots,I_{t,j},
+\]
+where \(I_{t,j}\) is the number of available members at \((t,j)\) (allowing for missing members).
+
+Define
+\[
+\bar y_{t,j} := \frac{1}{I_{t,j}}\sum_{i=1}^{I_{t,j}} y_T^{j,i}(k),
+\qquad
+S_{w,t,j} := \sum_{i=1}^{I_{t,j}} \big(y_T^{j,i}(k)-\bar y_{t,j}\big)^2.
+\]
+
+**State filtering/smoothing at time \(t\):**
+Replace the \(I_{t,j}\) member observations by the single aggregated observation
+\[
+\boxed{
+\bar y_{t,j} \mid \beta_t,\sigma_j^2 \sim N\!\left(e_{t,j}^\top \beta_t,\ \frac{\sigma_j^2}{I_{t,j}}\right),
+\qquad j=1,\dots,J_f,
+}
+\]
+and assimilate these \(J_f\) aggregated observations (still sequentially across \(j\), if desired).
+
+**Variance SSE accounting for \(\sigma_j^2\):**
+With \(\eta_{t,j}:=e_{t,j}^\top \beta_t\),
+\[
+\boxed{
+\mathrm{SSE}_j \;{+}{=}\; S_{w,t,j} \;+\; I_{t,j}\,(\bar y_{t,j}-\eta_{t,j})^2,
+\qquad
+N_j \;{+}{=}\; I_{t,j}.
+}
+\]
+This preserves the exact IG full conditional in Section 4.1.
+
+---
+
+### 10.5 VB analogues (aggregation with expected precisions)
+
+In VB, the state update uses expected precisions. For a product \(j\),
+\[
+\tau_j := \mathbb{E}_q[(\sigma_j^2)^{-1}],
+\]
+so \(I_{t,j}\) independent members contribute total precision \(I_{t,j}\tau_j\) to the information matrix at time \(t\).
+Equivalently, in the pseudo-observation formulation you may use the aggregated variance
+\[
+\boxed{
+\tilde r_{t,j}^{\text{agg}} := \big(I_{t,j}\,\tau_j\big)^{-1},
+\qquad
+\bar y_{t,j} \mid x_t \approx N\!\left(h_{t,j}^\top x_t,\ \tilde r_{t,j}^{\text{agg}}\right),
+}
+\]
+where \(h_{t,j}\) is \(e_{t,j}\) (Model C) or the appropriate design for Models A/B.
+
+For the expected SSE used in the \(q(\sigma_j^2)\) update (Section 6.3), let \(q(x_t)=N(m_t,C_t)\) and define
+\(\mu_{t,j}:=h_{t,j}^\top m_t\), \(v_{t,j}:=h_{t,j}^\top C_t h_{t,j}\). Then
+\[
+\sum_{i=1}^{I_{t,j}} \mathbb{E}_q\!\big[(y_{t,j,i}-h_{t,j}^\top x_t)^2\big]
+=
+\sum_{i=1}^{I_{t,j}} (y_{t,j,i}-\mu_{t,j})^2 + I_{t,j} v_{t,j}.
+\]
+Using the same decomposition,
+\[
+\sum_{i=1}^{I_{t,j}} (y_{t,j,i}-\mu_{t,j})^2
+=
+S_{w,t,j} + I_{t,j}(\bar y_{t,j}-\mu_{t,j})^2,
+\]
+so an aggregation-friendly expected SSE increment is
+\[
+\boxed{
+\mathbb{E}_q[\mathrm{SSE}_j]\;{+}{=}\; S_{w,t,j} + I_{t,j}\big(\bar y_{t,j}-h_{t,j}^\top m_t\big)^2 + I_{t,j}\,h_{t,j}^\top C_t h_{t,j}.
+}
+\]
+
+---
+
+### 10.6 Extension: unequal variances / weights (optional)
+
+If replicates have possibly different known variances \(r_i\) (or VB-effective variances), i.e.
+\[
+y_i \mid x_t \sim N(h^\top x_t,\ r_i),\qquad \tau_i:=r_i^{-1},
+\]
+then
+\[
+\sum_{i=1}^n \tau_i (y_i-h^\top x_t)^2
+=
+\sum_{i=1}^n \tau_i (y_i-\bar y_w)^2 + \Big(\sum_{i=1}^n \tau_i\Big)(\bar y_w-h^\top x_t)^2,
+\]
+where
+\[
+\bar y_w := \frac{\sum_{i=1}^n \tau_i y_i}{\sum_{i=1}^n \tau_i}.
+\]
+Thus, replace \(\{(y_i,h,r_i)\}\) by the single weighted aggregate \((\bar y_w,h,r_{\text{agg}})\) with
+\[
+\boxed{
+r_{\text{agg}} := \Big(\sum_{i=1}^n \tau_i\Big)^{-1}.
+}
+\]
+This is exact for Gaussian likelihoods under conditional independence.
+
+---
+
+### Dependencies
+
+* Section 3: sequential scalar assimilation formulas; FFBS/smoother infrastructure.
+* Section 4: IG variance updates via SSE decomposition.
+* Section 6: VB expected-SSE formula and use of expected precisions.
+* Section 8: observation-list interface; mapping of forecast member channels to \((h,r)\).
+-----------
+([Past chat][1])([Past chat][2])([Past chat][3])
+
+## Section 10 — Forecast correction and synthesis for the target series (implementation-ready)
+
+This section formalizes the **corrected** (per-product) and **synthesized** (target) forecast distributions at forecast times (t=T+k), using posterior output from **MCMC** (Sections 3–5) or **VB** (Sections 6–7).
+
+---
+
+### 10.1 Posterior for latent corrected signals at forecast time (t=T+k)
+
+Fix a forecast time (t=T+k). Under Model C, the latent state is (x_t=\beta_t\in\mathbb{R}^{d_\beta}), and each product-specific latent mean is
+[
+\boxed{
+\mu_t^{(j)} := e_{t,j}^\top \beta_t,
+\qquad j=1,\dots,J_f.
+}
+]
+(Recall (e_{t,j}) selects the baseline block plus the (j)-th discrepancy block, e.g., (e_{t,j}^\top\beta_t = F_t^\top\theta_t + F_t^\top\delta_t^j).)
+
+#### (a) MCMC (exact Monte Carlo)
+
+Given draws ({\beta_t^{(s)}}*{s=1}^S),
+[
+\boxed{
+\mu_t^{(j),(s)} := e*{t,j}^\top \beta_t^{(s)},
+\qquad s=1,\dots,S.
+}
+]
+Then ({\mu_t^{(j),(s)}}) approximates the posterior (p(\mu_t^{(j)}\mid \mathcal{D})), and you can report:
+[
+\widehat{\mathbb{E}}[\mu_t^{(j)}\mid\mathcal{D}] = \frac1S\sum_{s=1}^S \mu_t^{(j),(s)},
+\qquad
+\widehat{\mathrm{Var}}(\mu_t^{(j)}\mid\mathcal{D}) = \frac1S\sum_{s=1}^S \big(\mu_t^{(j),(s)}\big)^2 - \widehat{\mathbb{E}}[\mu_t^{(j)}\mid\mathcal{D}]^2.
+]
+
+#### (b) VB (Gaussian marginal under (q))
+
+If (q(\beta_t)=N(m_t,C_t)), then the implied marginal for (\mu_t^{(j)}) is Normal:
+[
+\boxed{
+\mu_t^{(j)} \ \big|\ \mathcal{D} \ \approx\ N!\left(
+e_{t,j}^\top m_t,\ e_{t,j}^\top C_t e_{t,j}
+\right)
+\quad\text{under }q.
+}
+]
+
+---
+
+### 10.2 Corrected predictive distribution for product-(j) ensemble members
+
+Each ensemble member observation at time (t=T+k) is modeled as
+[
+y_T^{j,i}(k)\mid \beta_t,\sigma_j^2 \sim N!\left(e_{t,j}^\top\beta_t,\ \sigma_j^2\right),
+\qquad i=1,\dots,I_j.
+]
+
+#### (a) MCMC posterior predictive (exact mixture)
+
+For a new replicate member value (y_{t}^{j,\text{rep}}) at ((t,j)),
+[
+\boxed{
+y_{t}^{j,\text{rep}} \mid \mathcal{D}
+\approx
+\frac1S\sum_{s=1}^S N!\left(\mu_t^{(j),(s)},\ \sigma_j^{2,(s)}\right).
+}
+]
+Useful moment summaries:
+[
+\widehat{\mathbb{E}}[y_{t}^{j,\text{rep}}\mid\mathcal{D}]
+=========================================================
+
+\frac1S\sum_{s=1}^S \mu_t^{(j),(s)},
+\qquad
+\widehat{\mathrm{Var}}(y_{t}^{j,\text{rep}}\mid\mathcal{D})
+===========================================================
+
+## \frac1S\sum_{s=1}^S\Big(\sigma_j^{2,(s)}+(\mu_t^{(j),(s)})^2\Big)
+
+\widehat{\mathbb{E}}[y_{t}^{j,\text{rep}}\mid\mathcal{D}]^2.
+]
+
+#### (b) VB moment-matched Normal predictive
+
+Using (q(\beta_t)=N(m_t,C_t)) and (q(\sigma_j^2)=\mathrm{IG}(a_j,b_j)), report
+[
+\boxed{
+y_{t}^{j,\text{rep}} \mid \mathcal{D}\ \approx
+N!\left(
+e_{t,j}^\top m_t,
+e_{t,j}^\top C_t e_{t,j} + \tilde\sigma_j^2
+\right),
+}
+\qquad
+\tilde\sigma_j^2 := \big(\mathbb{E}_q[(\sigma_j^2)^{-1}]\big)^{-1}=\frac{b_j}{a_j}.
+]
+(Alternatively use (\mathbb{E}_q[\sigma_j^2]=b_j/(a_j-1)) if (a_j>1).)
+
+---
+
+### 10.3 Synthesized forecast for the target series (y_t^0) at (t=T+k)
+
+To produce a forecast for the **target** at forecast time (t), you must specify how the target observation equation is defined in the forecast period. Two consistent conventions:
+
+#### Option S1 (target depends only on the baseline block (\theta_t))
+
+Define the target forecast model via the baseline block contained in (\beta_t):
+[
+\boxed{
+y_t^0 \mid \beta_t,\sigma_0^2 \sim N!\left(F_t^\top\theta_t,\ \sigma_0^2\right),
+\qquad \theta_t\ \text{is the baseline subvector of }\beta_t.
+}
+]
+Let (s_\theta(\beta_t)=\theta_t) denote the selector extracting (\theta_t). Then define
+[
+\boxed{
+\mu_t^0 := F_t^\top s_\theta(\beta_t) = h_t^{0\top}\beta_t,
+\quad\text{with}\quad
+h_t^0 := \begin{pmatrix}F_t\0\\vdots\0\end{pmatrix}\in\mathbb{R}^{d_\beta}.
+}
+]
+Now everything reduces to the same mechanics as §10.2 with ((e_{t,j},\sigma_j^2)) replaced by ((h_t^0,\sigma_0^2)).
+
+#### Option S2 (carry the full historical state (\alpha_t) forward)
+
+If your original ensemble document carries (\alpha_t=(\theta_t,\zeta_t,\psi_t)) into the forecast period, then define
+[
+\boxed{
+y_t^0 \mid \alpha_t,\sigma_0^2 \sim N!\left(\tilde F_t^\top\alpha_t,\ \sigma_0^2\right),
+\qquad t=T+1,\dots,T+K,
+}
+]
+with (\alpha_t) evolved by the same ((\tilde G_t,\tilde W_t)). In that case, the synthesized target forecast is computed from the posterior of (\alpha_t) (not (\beta_t)), but the predictive formulas are identical after replacing ((\beta_t,e_{t,j})) by ((\alpha_t,\tilde F_t)).
+
+> In either option, the “synthesis” occurs because the forecast data (\mathcal{Y}_{T+k}) updates the posterior of the latent baseline (and discrepancy) components through the filtering/smoothing step in Model C.
+
+---
+
+### 10.4 Reportable forecast summaries (closed form under Gaussian)
+
+Once you have a Normal approximation (VB) or Monte Carlo mixture (MCMC), you can report the standard summaries at each forecast time (t=T+k):
+
+* **Point forecast:** posterior mean of (y_t^0).
+* **Uncertainty:** posterior predictive standard deviation.
+* **Central intervals:** e.g., 50%, 80%, 95% intervals.
+* **Exceedance probabilities:** for threshold (c),
+  [
+  \Pr(y_t^0>c\mid\mathcal{D})
+  \approx
+  \begin{cases}
+  \frac1S\sum_{s=1}^S \left[1-\Phi!\left(\dfrac{c-\mu_t^{0,(s)}}{\sigma_0^{(s)}}\right)\right], & \text{MCMC},[1.25em]
+  1-\Phi!\left(\dfrac{c-\mu_t^{0,\text{VB}}}{\sqrt{v_t^{0,\text{VB}}}}\right), & \text{VB Normal}.
+  \end{cases}
+  ]
+
+---
+
+### Dependencies
+
+* Section 3 (and Section 6): posterior moments/draws for (\beta_t) (and optionally (\alpha_t)).
+* Section 4: posterior draws for (\sigma_j^2) (MCMC) or (q(\sigma_j^2)) parameters (VB).
+* Section 9: generic predictive mechanics; this section specializes them to “corrected per-product” and “synthesized target” outputs.
+-------
+
+
