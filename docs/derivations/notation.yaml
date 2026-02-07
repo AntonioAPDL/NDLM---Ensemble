@@ -1,0 +1,288 @@
+symbols:
+  - symbol: y_t^0
+    latex: y_t^0
+    meaning: Historical target observation
+    domain: real
+    dimensions: scalar
+    indexing: t=1..T
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:A_obs
+
+  - symbol: z_t^j
+    latex: z_t^j
+    meaning: Historical retrospective product observation for source j
+    domain: real
+    dimensions: scalar
+    indexing: t=1..T, j=1..J
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:B_obs
+
+  - symbol: y_T^{j,i}(k)
+    latex: y_T^{j,i}(k)
+    meaning: Forecast ensemble member observation
+    domain: real
+    dimensions: scalar
+    indexing: j=1..J_f, i=1..I_j, k=1..K
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:C_obs
+
+  - symbol: y_{t,n}
+    latex: y_{t,n}
+    meaning: Generic scalar observation n at time t in the unified observation-list interface
+    domain: real
+    dimensions: scalar
+    indexing: t=1..T+K, n=1..n_t
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:obs_list
+
+  - symbol: theta_t
+    latex: \bm\theta_t
+    meaning: Baseline latent DLM state
+    domain: R^q
+    dimensions: vector(q)
+    indexing: t=0..T+K
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:A_theta
+
+  - symbol: delta_t^j
+    latex: \bm\delta_t^j
+    meaning: Discrepancy latent state for source j
+    domain: R^q
+    dimensions: vector(q)
+    indexing: t=0..T+K, j=1..J
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:B_delta
+
+  - symbol: psi_t
+    latex: \bm\psi_t
+    meaning: Regression-effect latent state in transfer component
+    domain: R^m
+    dimensions: vector(m)
+    indexing: t=0..T
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:A_psi
+
+  - symbol: zeta_t
+    latex: \zeta_t
+    meaning: Scalar transfer latent state
+    domain: real
+    dimensions: scalar
+    indexing: t=0..T
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:A_zeta
+
+  - symbol: alpha_t
+    latex: \bm\alpha_t
+    meaning: Historical stacked latent state
+    domain: R^(q+1+m)
+    dimensions: vector(q+1+m)
+    indexing: t=0..T
+    introduced: docs/derivations/sections/01_notation_and_model.tex
+
+  - symbol: beta_t
+    latex: \bm\beta_t
+    meaning: Forecast stacked latent state
+    domain: R^(q(1+J_f))
+    dimensions: vector(q(1+J_f))
+    indexing: t=T..T+K
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:C_state
+
+  - symbol: F_t
+    latex: \bm F_t
+    meaning: Baseline design vector
+    domain: R^q
+    dimensions: vector(q)
+    indexing: t=1..T+K
+    introduced: docs/derivations/sections/01_notation_and_model.tex
+
+  - symbol: F_t_tilde
+    latex: \tilde{\bm F}_t
+    meaning: Augmented historical design vector
+    domain: R^(q+1+m)
+    dimensions: vector(q+1+m)
+    indexing: t=1..T
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:A_obs
+
+  - symbol: e_{t,j+1}
+    latex: \bm e_{t,j+1}
+    meaning: Forecast selector/design vector for source j
+    domain: R^(q(1+J_f))
+    dimensions: vector(q(1+J_f))
+    indexing: t=T+1..T+K, j=1..J_f
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:C_obs
+
+  - symbol: e_t
+    latex: \bm e_t
+    meaning: Generic transition innovation vector in covariance updates
+    domain: R^d
+    dimensions: vector(d)
+    indexing: t=1..T_b
+    introduced: docs/derivations/sections/04_static_conditionals.tex:eq:cond_W
+
+  - symbol: G_t
+    latex: \bm G_t
+    meaning: Baseline state evolution matrix
+    domain: R^(q x q)
+    dimensions: matrix(q,q)
+    indexing: t=1..T+K
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:A_theta
+
+  - symbol: M_t
+    latex: \bm M_t
+    meaning: Forecast stacked evolution matrix
+    domain: R^(q(1+J_f) x q(1+J_f))
+    dimensions: matrix(q(1+J_f),q(1+J_f))
+    indexing: t=T+1..T+K
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:C_state
+
+  - symbol: W_t_theta
+    latex: \bm W_t^\theta
+    meaning: Baseline state evolution covariance
+    domain: SPD(q)
+    dimensions: matrix(q,q)
+    indexing: t=1..T
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:A_theta
+
+  - symbol: W_t_delta_j
+    latex: \bm W_t^{\delta^j}
+    meaning: Discrepancy state evolution covariance for source j
+    domain: SPD(q)
+    dimensions: matrix(q,q)
+    indexing: t=1..T, j=1..J
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:B_delta
+
+  - symbol: W_t_beta
+    latex: \bm W_t^\beta
+    meaning: Forecast stacked state evolution covariance
+    domain: SPD(q(1+J_f))
+    dimensions: matrix(q(1+J_f),q(1+J_f))
+    indexing: t=T+1..T+K
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:C_state
+
+  - symbol: sigma_j^2
+    latex: \sigma_j^2
+    meaning: Observation variance for source j
+    domain: positive real
+    dimensions: scalar
+    indexing: j=0..J
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:prior_sigma
+
+  - symbol: lambda
+    latex: \lambda
+    meaning: Transfer AR coefficient
+    domain: real (or [-1,1] under stationarity constraint)
+    dimensions: scalar
+    indexing: static
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:prior_lambda
+
+  - symbol: x_t
+    latex: \bm x_t
+    meaning: Generic state placeholder in unified linear-Gaussian form
+    domain: R^d
+    dimensions: vector(d)
+    indexing: t=0..T+K
+    introduced: docs/derivations/sections/03_state_posterior_ffbs.tex:eq:lgssm_state
+
+  - symbol: h_{t,n}
+    latex: \bm h_{t,n}
+    meaning: Observation design vector for observation n at time t
+    domain: R^d
+    dimensions: vector(d)
+    indexing: t=1..T+K, n=1..n_t
+    introduced: docs/derivations/sections/03_state_posterior_ffbs.tex:eq:lgssm_obs
+
+  - symbol: h_t
+    latex: \bm h_t
+    meaning: FFBS backward conditional mean
+    domain: R^d
+    dimensions: vector(d)
+    indexing: t=0..T-1
+    introduced: docs/derivations/sections/03_state_posterior_ffbs.tex:eq:ffbs_h
+
+  - symbol: r_{t,n}
+    latex: r_{t,n}
+    meaning: Observation noise variance for observation n at time t
+    domain: positive real
+    dimensions: scalar
+    indexing: t=1..T+K, n=1..n_t
+    introduced: docs/derivations/sections/03_state_posterior_ffbs.tex:eq:lgssm_obs
+
+  - symbol: r_n^{(j)}
+    latex: r_n^{(j)}
+    meaning: Residual for source j at indexed observation n
+    domain: real
+    dimensions: scalar
+    indexing: n in I_j, j=0..J
+    introduced: docs/derivations/sections/04_static_conditionals.tex:eq:cond_sigma
+
+  - symbol: mu_n^{(j)}
+    latex: \mu_n^{(j)}
+    meaning: Mean predictor for source j at indexed observation n
+    domain: real
+    dimensions: scalar
+    indexing: n in I_j, j=0..J
+    introduced: docs/derivations/sections/04_static_conditionals.tex:eq:cond_sigma
+
+  - symbol: SSE_j
+    latex: \mathrm{SSE}_j
+    meaning: Sum of squared residuals for source j
+    domain: nonnegative real
+    dimensions: scalar
+    indexing: j=0..J
+    introduced: docs/derivations/sections/04_static_conditionals.tex:eq:cond_sigma
+
+  - symbol: N_j
+    latex: N_j
+    meaning: Number of observations assigned to source j
+    domain: positive integer
+    dimensions: scalar
+    indexing: j=0..J
+    introduced: docs/derivations/sections/04_static_conditionals.tex:eq:cond_sigma
+
+  - symbol: ELBO
+    latex: \ELBO
+    meaning: Evidence lower bound under mean-field approximation
+    domain: real
+    dimensions: scalar
+    indexing: iteration r
+    introduced: docs/derivations/sections/07_elbo.tex:eq:elbo_def
+
+  - symbol: a_t
+    latex: \bm a_t
+    meaning: Kalman one-step predicted state mean
+    domain: R^d
+    dimensions: vector(d)
+    indexing: t=1..T+K
+    introduced: docs/derivations/sections/03_state_posterior_ffbs.tex
+
+  - symbol: m_t
+    latex: \bm m_t
+    meaning: Filtered state mean at time t
+    domain: R^d
+    dimensions: vector(d)
+    indexing: t=0..T+K or t=1..T+K,n=0..n_t
+    introduced: docs/derivations/sections/03_state_posterior_ffbs.tex:eq:kf_m
+
+  - symbol: C_t
+    latex: \bm C_t
+    meaning: Filtered state covariance at time t
+    domain: SPD(d)
+    dimensions: matrix(d,d)
+    indexing: t=0..T+K or t=1..T+K,n=0..n_t
+    introduced: docs/derivations/sections/03_state_posterior_ffbs.tex:eq:kf_C
+
+  - symbol: R_t
+    latex: \bm R_t
+    meaning: One-step predicted state covariance at time t
+    domain: SPD(d)
+    dimensions: matrix(d,d)
+    indexing: t=1..T+K or t=1..T+K,n=0..n_t-1
+    introduced: docs/derivations/sections/03_state_posterior_ffbs.tex
+
+  - symbol: K_{t,n}
+    latex: \bm K_{t,n}
+    meaning: Kalman gain for observation n at time t
+    domain: R^d
+    dimensions: vector(d)
+    indexing: t=1..T+K, n=1..n_t
+    introduced: docs/derivations/sections/03_state_posterior_ffbs.tex:eq:kf_K
+
+  - symbol: B_t
+    latex: \bm B_t
+    meaning: FFBS backward gain matrix
+    domain: R^(d x d)
+    dimensions: matrix(d,d)
+    indexing: t=0..T-1
+    introduced: docs/derivations/sections/03_state_posterior_ffbs.tex:eq:ffbs_B
