@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Minimal latexmk-compatible wrapper for environments without system latexmk.
+set -euo pipefail
+
+pdf_mode=0
+tex_file=""
+pdflatex_args=()
+
+for arg in "$@"; do
+  case "$arg" in
+    -pdf)
+      pdf_mode=1
+      ;;
+    -interaction=*|-halt-on-error|-file-line-error|-synctex=*|-output-directory=*)
+      pdflatex_args+=("$arg")
+      ;;
+    -*)
+      # Ignore unsupported latexmk-only flags in this lightweight wrapper.
+      ;;
+    *.tex)
+      tex_file="$arg"
+      ;;
+  esac
+done
+
+if [[ "$pdf_mode" -ne 1 ]]; then
+  echo "latexmk-wrapper: only -pdf mode is supported" >&2
+  exit 2
+fi
+
+if [[ -z "$tex_file" ]]; then
+  echo "latexmk-wrapper: missing .tex input file" >&2
+  exit 2
+fi
+
+if ! command -v pdflatex >/dev/null 2>&1; then
+  echo "latexmk-wrapper: pdflatex is required but not found" >&2
+  exit 127
+fi
+
+prev_aux_hash=""
+for pass in 1 2 3; do
+  pdflatex "${pdflatex_args[@]}" "$tex_file"
+  aux_file="${tex_file%.tex}.aux"
+  if [[ -f "$aux_file" ]]; then
+    curr_aux_hash="$(md5sum "$aux_file" | awk '{print $1}')"
+    if [[ "$curr_aux_hash" == "$prev_aux_hash" && "$pass" -ge 2 ]]; then
+      break
+    fi
+    prev_aux_hash="$curr_aux_hash"
+  fi
+done

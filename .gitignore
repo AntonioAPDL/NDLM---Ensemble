@@ -17,6 +17,7 @@ venv/
 *.log
 *.out
 *.pdf
+*.toc
 *.run.xml
 *.synctex.gz
 
