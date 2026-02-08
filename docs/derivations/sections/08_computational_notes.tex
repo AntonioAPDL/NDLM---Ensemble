@@ -28,3 +28,12 @@ The derivations must reduce to known special cases:
 \item Kalman/FFBS moments match brute-force Gaussian conditioning on toy systems.
 \item Analytic derivatives for the $\lambda$ block match finite differences.
 \end{itemize}
+
+\subsection{Audit Statement}
+The derivation set is intended to be implementation-complete:
+joint kernels are explicit \eqref{eq:log_joint_A}--\eqref{eq:log_joint_C},
+MCMC blocks are equation-linked, VB factors are derived from \eqref{eq:vb_cavi_rule},
+and ELBO monitoring uses the block formulas in \eqref{eq:elbo_blocks},
+\eqref{eq:elbo_init_block}--\eqref{eq:elbo_entropy_lambda}.
+Any future model extension should preserve this structure by adding
+the corresponding joint, conditional, VB, and ELBO blocks before implementation.
