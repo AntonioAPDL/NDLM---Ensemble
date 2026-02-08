@@ -43,3 +43,57 @@ p(\text{data},\text{states},\Theta),
 \end{align}
 with the explicit factorization given by \eqref{eq:joint_A}--\eqref{eq:joint_C}.
 These product forms are the basis for Gibbs blocks and CAVI factors.
+
+\subsection{Computable complete log-joint forms}
+For implementation, it is convenient to evaluate each model with explicit residual and innovation sums.
+Define
+\begin{align}
+\bm e_t^{A}&:=\bm\alpha_t-\tilde{\bm G}_t\bm\alpha_{t-1},
+& r_t^{0}&:=y_t^0-\tilde{\bm F}_t^\T\bm\alpha_t, \nonumber\\
+\bm e_t^{\delta,j}&:=\bm\delta_t^j-\bm G_t\bm\delta_{t-1}^j,
+& r_t^{j}&:=z_t^j-\tilde{\bm F}_t^\T\bm\alpha_t-\bm F_t^\T\bm\delta_t^j,\nonumber\\
+\bm e_t^{\beta}&:=\bm\beta_t-\bm M_t\bm\beta_{t-1},
+& r_{t,n}^{C}&:=y_{t,n}-\bm h_{t,n}^\T\bm\beta_t.
+\label{eq:joint_residuals}
+\end{align}
+Then, up to additive constants independent of unknowns:
+\begin{align}
+\log p_A
+=\;&
+\log p(\bm\alpha_0)+\log p(\Theta_A)
+-\frac12\sum_{t=1}^{T}\!\left[
+\log|\tilde{\bm W}_t|+(\bm e_t^A)^\T \tilde{\bm W}_t^{-1}\bm e_t^A
+\right] \nonumber\\
+&-\frac12\sum_{t=1}^{T}\!\left[
+\log \sigma_0^2+\frac{(r_t^0)^2}{\sigma_0^2}
+\right],
+\label{eq:log_joint_A}
+\end{align}
+\begin{align}
+\log p_B
+=\;&
+\log p_A
++\sum_{j=1}^{J}\log p(\bm\delta_0^j)
+-\frac12\sum_{j=1}^{J}\sum_{t=1}^{T}\!\left[
+\log|\bm W_t^{\delta^j}|+(\bm e_t^{\delta,j})^\T(\bm W_t^{\delta^j})^{-1}\bm e_t^{\delta,j}
+\right] \nonumber\\
+&-\frac12\sum_{j=1}^{J}\sum_{t=1}^{T}\!\left[
+\log \sigma_j^2+\frac{(r_t^j)^2}{\sigma_j^2}
+\right],
+\label{eq:log_joint_B}
+\end{align}
+\begin{align}
+\log p_C
+=\;&
+\log p(\bm\beta_T)+\log p(\Theta_C)
+-\frac12\sum_{t=T+1}^{T+K}\!\left[
+\log|\bm W_t^\beta|+(\bm e_t^\beta)^\T(\bm W_t^\beta)^{-1}\bm e_t^\beta
+\right] \nonumber\\
+&-\frac12\sum_{t=T+1}^{T+K}\sum_{n=1}^{n_t}\!\left[
+\log \sigma^2_{\mathrm{src}(t,n)}+\frac{(r_{t,n}^{C})^2}{\sigma^2_{\mathrm{src}(t,n)}}
+\right],
+\label{eq:log_joint_C}
+\end{align}
+where $\mathrm{src}(t,n)$ maps each scalar observation to its source-variance index.
+Equations \eqref{eq:log_joint_A}--\eqref{eq:log_joint_C} are the direct objectives used to
+compute sufficient statistics for both Gibbs updates and CAVI blocks.
