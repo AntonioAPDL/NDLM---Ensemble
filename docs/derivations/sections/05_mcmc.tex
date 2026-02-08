@@ -1,6 +1,9 @@
 \section{Blocked MCMC Algorithm}
 
 One Gibbs/MH sweep for the Gaussian NDLM proceeds as follows.
+Each step is evaluated from the computable kernels in
+\eqref{eq:log_joint_A}--\eqref{eq:log_joint_C} and the conditional families in
+\eqref{eq:cond_sigma}, \eqref{eq:cond_W}, and \eqref{eq:cond_lambda}.
 
 \begin{enumerate}[label=\textbf{Step \arabic*:},leftmargin=2.8cm]
 \item Sample state trajectories using FFBS:
@@ -19,6 +22,26 @@ with block choice either joint stacked state or conditional blocks.
 \item Forecast-period smoothing/sampling (if Model C active):
 run FFBS on $\bm\beta_{T:T+K}$ conditional on sampled static parameters.
 \end{enumerate}
+
+\subsection{One-sweep pseudocode with required intermediates}
+\begin{enumerate}[label=\textbf{P\arabic*:},leftmargin=2.0cm]
+\item Build source-wise residual sums of squares using \eqref{eq:joint_residuals}
+and current state draws:
+\[
+\mathrm{SSE}_j=\sum_{n\in\mathcal{I}_j}\big(r_n^{(j)}\big)^2.
+\]
+\item Draw state paths by FFBS with \eqref{eq:kf_f}--\eqref{eq:ffbs_cond},
+assimilating all observations at each time in observation-list order.
+\item Draw each $\sigma_j^2$ from \eqref{eq:cond_sigma} using the updated $\mathrm{SSE}_j$.
+\item Draw each evolution covariance block from \eqref{eq:cond_W} using innovation outer products
+$\bm e_t\bm e_t^\T$ computed from the updated state paths.
+\item Draw $\lambda$ from \eqref{eq:cond_lambda} (or truncated variant), then refresh
+the transition means that depend on $\lambda$.
+\item If Model C is active, run the forecast FFBS block for $\bm\beta_{T:T+K}$ under the
+newly sampled static parameters.
+\end{enumerate}
+Practical numerics: use Cholesky solves for Kalman/FFBS covariance systems and symmetrize sampled
+covariance matrices before reuse in the next sweep.
 
 \subsection{Diagnostics Required for Correctness}
 Track and report:
