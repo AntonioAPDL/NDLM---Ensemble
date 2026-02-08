@@ -43,6 +43,65 @@ T_bd_b\log(2\pi)
 \right).
 \label{eq:elbo_trans_block}
 \end{align}
+\[
+\mathcal{L}_{\text{trans}}=\sum_b \mathcal{L}_{\text{trans},b}.
+\]
+
+\subsection{Computable prior and entropy blocks}
+Let $d_b$ denote the dimension of covariance block $b$, and let
+$c_{\IW}(\nu,\bm S)$ denote the inverse-Wishart normalizing constant.
+Then the remaining ELBO terms are computed as:
+\begin{align}
+\mathcal{L}_{\text{init}}
+&=
+-\frac{p_0}{2}\log(2\pi)
+-\frac12\log|\bm C_0|
+-\frac12\tr\!\left(\bm C_0^{-1}\E_q[(\bm x_0-\bm m_0)(\bm x_0-\bm m_0)^\T]\right), \label{eq:elbo_init_block}\\
+\mathcal{L}_{\text{priors},\sigma}
+&=
+\sum_{j=0}^{J}
+\left[
+a_{\sigma j}\log b_{\sigma j}-\log\Gamma(a_{\sigma j})
+-(a_{\sigma j}+1)\E_q[\log \sigma_j^2]
+-b_{\sigma j}\E_q[\sigma_j^{-2}]
+\right], \label{eq:elbo_prior_sigma_block}\\
+\mathcal{L}_{\text{priors},W}
+&=
+\sum_b\Big[
+\log c_{\IW}(\nu_b,\bm S_b)
+-\frac{\nu_b+d_b+1}{2}\E_q[\log|\bm W_b|]
+-\frac12\tr\!\big(\bm S_b\,\E_q[\bm W_b^{-1}]\big)
+\Big], \label{eq:elbo_prior_W_block}\\
+\mathcal{L}_{\text{priors},\lambda}
+&=
+-\frac12\log(2\pi C_{\lambda0})
+-\frac12 C_{\lambda0}^{-1}\E_q[(\lambda-m_{\lambda0})^2], \label{eq:elbo_prior_lambda_block}
+\end{align}
+with $\mathcal{L}_{\text{priors}}
+=\mathcal{L}_{\text{priors},\sigma}
++\mathcal{L}_{\text{priors},W}
++\mathcal{L}_{\text{priors},\lambda}$.
+Entropy blocks are
+\begin{align}
+\mathcal{H}_{\sigma_j^2}
+&=
+\tilde a_{\sigma j}+\log \tilde b_{\sigma j}+\log\Gamma(\tilde a_{\sigma j})
+-(1+\tilde a_{\sigma j})\psi(\tilde a_{\sigma j}), \label{eq:elbo_entropy_sigma}\\
+\mathcal{H}_{W_b}
+&=
+-\log c_{\IW}(\tilde\nu_b,\tilde{\bm S}_b)
++\frac{\tilde\nu_b+d_b+1}{2}\E_q[\log|\bm W_b|]
++\frac12\tr\!\big(\tilde{\bm S}_b\,\E_q[\bm W_b^{-1}]\big), \label{eq:elbo_entropy_W}\\
+\mathcal{H}_{\lambda}
+&=
+\frac12\log\!\big(2\pi e\,\tilde C_\lambda\big). \label{eq:elbo_entropy_lambda}
+\end{align}
+For the Gaussian state factor, use
+\[
+\mathcal{H}_{\text{states}}
+=\frac12\left(D_x\log(2\pi e)+\log|\bm\Sigma_x^\star|\right),
+\]
+where $D_x$ is the stacked state dimension and $\bm\Sigma_x^\star$ is the state-factor covariance.
 
 \subsection{Convergence Criterion}
 Stop CAVI when
