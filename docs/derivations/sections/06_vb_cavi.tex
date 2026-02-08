@@ -7,6 +7,13 @@ q(\text{states},\sigma^2,W,\lambda)
 = q(\text{states})\prod_{j=0}^J q(\sigma_j^2)\prod_b q(\bm W_b)q(\lambda).
 \label{eq:vb_factorization}
 \end{align}
+Each coordinate update uses the generic CAVI rule
+\begin{align}
+\log q_i^\star(\vartheta_i)
+= \E_{q_{-i}}[\log p(\text{data},\text{all unknowns})] + \text{const},
+\label{eq:vb_cavi_rule}
+\end{align}
+then identifies the corresponding exponential-family kernel.
 
 \subsection{State Factor}
 Given current expected precisions,
@@ -16,6 +23,8 @@ q(\text{states})\propto
 \end{align}
 which remains Gaussian and is computed by a Kalman smoother on a pseudo-model with
 $\E_q[1/\sigma_j^2]$ and $\E_q[\bm W_b^{-1}]$ inserted.
+This is the direct Gaussian kernel implied by \eqref{eq:vb_cavi_rule} and
+\eqref{eq:log_joint_A}--\eqref{eq:log_joint_C}.
 
 \subsection{Variance Factors}
 For each $j$,
@@ -25,6 +34,8 @@ q(\sigma_j^2) &= \IG(\tilde a_{\sigma j},\tilde b_{\sigma j}), \\
 \tilde b_{\sigma j} &= b_{\sigma j}+\frac{1}{2}\E_q[\mathrm{SSE}_j].
 \label{eq:vb_sigma}
 \end{align}
+These parameters come from collecting terms in
+$\log \sigma_j^2$ and $\sigma_j^{-2}$ under \eqref{eq:vb_cavi_rule}.
 
 \subsection{Evolution Covariance Factors}
 For each block $b$,
@@ -34,6 +45,8 @@ q(\bm W_b) &= \IW(\tilde\nu_b,\tilde{\bm S}_b), \\
 \tilde{\bm S}_b &= \bm S_b + \sum_{t=1}^{T_b} \E_q[\bm e_t\bm e_t^\T].
 \label{eq:vb_W}
 \end{align}
+Again, \eqref{eq:vb_cavi_rule} yields an inverse-Wishart kernel by grouping
+$\log|\bm W_b|$ and $\tr(\bm W_b^{-1}\cdot)$ terms.
 
 \subsection{Transfer Coefficient Factor}
 With Gaussian prior and constant $w^\zeta$,
@@ -48,6 +61,8 @@ where
 &= \tilde C_\lambda\left(C_{\lambda0}^{-1}m_{\lambda0}+\frac{1}{w^\zeta}\sum_{t=1}^T\E_q[\zeta_{t-1}(\zeta_t-\bm x_t^\T\bm\psi_t)]\right).
 \label{eq:vb_lambda}
 \end{align}
+This is the Normal kernel from the quadratic form in $\lambda$ induced by
+\eqref{eq:vb_cavi_rule} and the Gaussian transition model.
 
 \subsection{Expectations Required Each Iteration}
 \begin{itemize}
@@ -56,3 +71,15 @@ where
 \item $\E_q[\bm x_t]$, $\E_q[\bm x_t\bm x_t^\T]$, $\E_q[\bm x_t\bm x_{t-1}^\T]$,
 \item $\E_q[\mathrm{SSE}_j]$ and $\E_q[\bm e_t\bm e_t^\T]$.
 \end{itemize}
+
+Closed forms used in computation are:
+\begin{align}
+\E_q[\sigma_j^{-2}] &= \frac{\tilde a_{\sigma j}}{\tilde b_{\sigma j}},
+& \E_q[\log \sigma_j^2] &= \log \tilde b_{\sigma j}-\psi(\tilde a_{\sigma j}), \label{eq:vb_sigma_moments}\\
+\E_q[\bm W_b^{-1}] &= \tilde\nu_b\,\tilde{\bm S}_b^{-1},
+& \E_q[\log|\bm W_b|] &= \log|\tilde{\bm S}_b|-\sum_{i=1}^{d_b}\psi\!\Big(\frac{\tilde\nu_b+1-i}{2}\Big)-d_b\log 2, \label{eq:vb_iw_moments}\\
+\E_q[\bm x_t\bm x_t^\T] &= \bm C_t^\star+\bm m_t^\star(\bm m_t^\star)^\T,
+& \E_q[\bm x_t\bm x_{t-1}^\T] &= \bm C_{t,t-1}^\star+\bm m_t^\star(\bm m_{t-1}^\star)^\T. \label{eq:vb_state_moments}
+\end{align}
+The cross-covariance $\bm C_{t,t-1}^\star$ is obtained from the backward smoother recursion
+used to compute the Gaussian state factor.
