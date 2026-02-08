@@ -1,0 +1,25 @@
+name: latex-gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  latex-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install TeX dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            texlive-latex-base \
+            texlive-latex-recommended \
+            texlive-latex-extra \
+            texlive-fonts-recommended \
+            latexmk \
+            lmodern
+      - name: Run latex gate
+        run: bash scripts/latex_gate.sh

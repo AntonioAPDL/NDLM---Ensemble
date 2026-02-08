@@ -53,6 +53,12 @@ make test
 make compile
 ```
 
+- Run the hardening gate (build + fatal-log scan):
+
+```bash
+bash scripts/latex_gate.sh
+```
+
 ## Deterministic compile notes
 
 Compilation target is `docs/derivations/main.tex` via `latexmk -pdf -interaction=nonstopmode -halt-on-error`.
