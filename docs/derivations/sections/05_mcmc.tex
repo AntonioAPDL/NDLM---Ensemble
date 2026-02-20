@@ -20,7 +20,8 @@ with block choice either joint stacked state or conditional blocks.
 \item Update $\lambda$ via \eqref{eq:cond_lambda} (or a truncated Normal draw when $|\lambda|<1$ is enforced).
 
 \item Forecast-period smoothing/sampling (if Model C active):
-run FFBS on $\bm\beta_{T:T+K}$ conditional on sampled static parameters.
+run FFBS on $\bm\beta_{T:T+K_{\max}}$ conditional on sampled static parameters,
+using lead-specific active sets $\mathcal A_k=\{j:k\le K_j\}$.
 \end{enumerate}
 
 \subsection{One-sweep pseudocode with required intermediates}

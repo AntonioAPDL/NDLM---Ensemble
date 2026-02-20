@@ -39,3 +39,19 @@ For $t=T-1,\dots,0$,
 \subsection{Computability Constraints}
 All updates use Cholesky solves of $f_{t,n}$ (scalar) or small SPD matrices.
 No inversion of large $n_t\times n_t$ matrices is required when observations are assimilated sequentially.
+
+\subsection{Ragged-horizon forecast FFBS (Model C)}
+For Model C with source-specific horizons $K_j$, the lead-specific active set
+$\mathcal A_k=\{j:k\le K_j\}$ induces state dimension $p_k=q(1+|\mathcal A_k|)$.
+Two equivalent implementations are valid:
+\begin{enumerate}
+\item True transdimensional recursion in $\R^{p_k}$ with lead-dependent
+      $(\bm G_k,\bm Q_k,\bm h_{k,n})$.
+\item Fixed-dimension embedding $\tilde{\bm\beta}_{T+k}\in\R^{q(1+J_f)}$ with
+      deterministic selection/projection matrices $\bm S_k$ such that
+      $\bm\beta_{T+k}=\bm S_k\tilde{\bm\beta}_{T+k}$ and forecast likelihoods
+      only use active coordinates.
+\end{enumerate}
+The fixed-dimension form is algebraically equivalent to the transdimensional form
+provided inactive coordinates are projected out of both the measurement operators and
+the state innovation terms at each lead.

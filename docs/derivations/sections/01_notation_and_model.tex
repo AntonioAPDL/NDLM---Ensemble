@@ -1,7 +1,7 @@
 \section{Notation and Model Specification}
 
 \subsection{Indexing, Support, and Dimensions}
-Historical period is $t=1,\dots,T$ and forecast period is $t=T+1,\dots,T+K$.
+Historical period is $t=1,\dots,T$ and forecast period is $t=T+1,\dots,T+K_{\max}$.
 For $j=1,\dots,J$, $z_t^j\in\R$ denotes retrospective products;
 $y_t^0\in\R$ denotes the target series.
 Scope note: this document covers only Gaussian NDLM Models A--C in this repository;
@@ -56,13 +56,24 @@ z_t^j \given \bm\alpha_t,\bm\delta_t^j,\sigma_j^2
 \end{align}
 
 \subsection{Model C: Forecast Ensemble Likelihood (Gaussian)}
-For active forecasters $j=1,\dots,J_f$, members $i=1,\dots,I_j$, leads $k=1,\dots,K$,
+For active forecasters $j=1,\dots,J_f$, members $i=1,\dots,I_j$, and
+source-specific horizons $K_j$:
+\begin{align}
+\mathcal A_k &:= \{j: k\le K_j\}, \qquad J_k := |\mathcal A_k|, \qquad k=1,\dots,K_{\max},
+\end{align}
+with $K_{\max}:=\max_j K_j$ and state dimension $p_k:=q(1+J_k)$.
+For each lead $k=1,\dots,K_{\max}$ and each active source $j\in\mathcal A_k$,
 \begin{align}
  y_T^{j,i}(k) \given \bm\beta_{T+k},\sigma_j^2
  &\sim \N(\bm e_{T+k,j+1}^\T\bm\beta_{T+k},\sigma_j^2), \label{eq:C_obs}\\
- \bm\beta_t\given\bm\beta_{t-1}
- &\sim \N(\bm M_t\bm\beta_{t-1},\bm W_t^\beta). \label{eq:C_state}
+ \bm\beta_{T+k}\given\bm\beta_{T+k-1}
+ &\sim \N(\bm M_k^\star \bm\beta_{T+k-1},\bm W_k^\star). \label{eq:C_state}
 \end{align}
+Here $(\bm M_k^\star,\bm W_k^\star)$ are the transdimensional transition blocks.
+Equivalent fixed-dimension implementations may use an embedding state
+$\tilde{\bm\beta}_{T+k}\in\R^{q(1+J_f)}$ with deterministic selection matrix
+$\bm S_k\in\{0,1\}^{p_k\times q(1+J_f)}$ such that
+$\bm\beta_{T+k}=\bm S_k\tilde{\bm\beta}_{T+k}$.
 
 \subsection{Observation List Representation (Computable Form)}
 At each time $t$, index scalar observations by $n=1,\dots,n_t$:
