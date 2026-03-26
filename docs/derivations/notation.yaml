@@ -52,7 +52,7 @@ symbols:
     meaning: Regression-effect latent state in transfer component
     domain: R^m
     dimensions: vector(m)
-    indexing: t=0..T
+    indexing: t=0..T and t=T+1..T+K in the augmented forecast specification
     introduced: docs/derivations/sections/01_notation_and_model.tex:eq:A_psi
 
   - symbol: zeta_t
@@ -60,7 +60,7 @@ symbols:
     meaning: Scalar transfer latent state
     domain: real
     dimensions: scalar
-    indexing: t=0..T
+    indexing: t=0..T and t=T+1..T+K in the augmented forecast specification
     introduced: docs/derivations/sections/01_notation_and_model.tex:eq:A_zeta
 
   - symbol: alpha_t
@@ -79,6 +79,22 @@ symbols:
     indexing: t=T..T+K
     introduced: docs/derivations/sections/01_notation_and_model.tex
 
+  - symbol: c_t
+    latex: \bm c_t
+    meaning: Historical transfer covariate vector
+    domain: R^m
+    dimensions: vector(m)
+    indexing: t=1..T
+    introduced: docs/derivations/sections/01_notation_and_model.tex
+
+  - symbol: c_{T+k}^\star
+    latex: \bm c_{T+k}^\star
+    meaning: Supplied forecast-period transfer covariate vector
+    domain: R^m
+    dimensions: vector(m)
+    indexing: k=1..K_max
+    introduced: docs/derivations/sections/01_notation_and_model.tex
+
   - symbol: F_t
     latex: \bm F_t
     meaning: Baseline design vector
@@ -95,21 +111,21 @@ symbols:
     indexing: t=1..T
     introduced: docs/derivations/sections/01_notation_and_model.tex:eq:A_obs
 
-  - symbol: e_{t,j+1}
-    latex: \bm e_{t,j+1}
-    meaning: Reduced Model C forecast selector for source j
-    domain: R^(q(1+J_f))
-    dimensions: vector(q(1+J_f))
-    indexing: t=T+1..T+K, j=1..J_f
-    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:C_obs
+  - symbol: h_{T+k,j}^{red}
+    latex: \bm h_{T+k,j}^{\mathrm{red}}
+    meaning: Reduced Model C forecast design vector for active source j at lead k
+    domain: R^(p_k)
+    dimensions: vector(p_k)
+    indexing: k=1..K_max, j in A_k
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:C_h_red
 
-  - symbol: e_t
-    latex: \bm e_t
-    meaning: Generic transition innovation vector in covariance updates
-    domain: R^d
-    dimensions: vector(d)
-    indexing: t=1..T_b
-    introduced: docs/derivations/sections/04_static_conditionals.tex:eq:cond_W_hist
+  - symbol: e_t^A
+    latex: \bm e_t^A
+    meaning: Historical Model A transition innovation
+    domain: R^(q+1+m)
+    dimensions: vector(q+1+m)
+    indexing: t=1..T
+    introduced: docs/derivations/sections/02_joint_density.tex:eq:joint_residuals
 
   - symbol: G_t
     latex: \bm G_t
@@ -119,36 +135,52 @@ symbols:
     indexing: t=1..T+K
     introduced: docs/derivations/sections/01_notation_and_model.tex:eq:A_theta
 
-  - symbol: M_t
-    latex: \bm M_t
-    meaning: Reduced Model C forecast evolution matrix
-    domain: R^(q(1+J_f) x q(1+J_f))
-    dimensions: matrix(q(1+J_f),q(1+J_f))
-    indexing: t=T+1..T+K
+  - symbol: M_{T+k}^{(f)}
+    latex: \bm M_{T+k}^{(f)}
+    meaning: Generic Model C forecast transition mean map
+    domain: R^(d_k^{(f)} x d_{k-1}^{(f)})
+    dimensions: matrix(d_k^{(f)},d_{k-1}^{(f)})
+    indexing: k=1..K_max
     introduced: docs/derivations/sections/01_notation_and_model.tex:eq:C_state
 
   - symbol: W_t_theta
     latex: \bm W_t^\theta
-    meaning: Baseline state evolution covariance
+    meaning: Known time-varying historical baseline state evolution covariance
     domain: SPD(q)
     dimensions: matrix(q,q)
     indexing: t=1..T
     introduced: docs/derivations/sections/01_notation_and_model.tex:eq:A_theta
 
+  - symbol: W_t_zeta
+    latex: \bm W_t^\zeta
+    meaning: Known time-varying 1x1 historical transfer innovation covariance, equal to [w_t^\zeta]
+    domain: SPD(1)
+    dimensions: matrix(1,1)
+    indexing: t=1..T
+    introduced: docs/derivations/sections/01_notation_and_model.tex
+
+  - symbol: W_t_psi
+    latex: \bm W_t^\psi
+    meaning: Known time-varying historical regression-state evolution covariance
+    domain: SPD(m)
+    dimensions: matrix(m,m)
+    indexing: t=1..T
+    introduced: docs/derivations/sections/01_notation_and_model.tex:eq:A_psi
+
   - symbol: W_t_delta_j
     latex: \bm W_t^{\delta^j}
-    meaning: Discrepancy state evolution covariance for source j
+    meaning: Known time-varying historical discrepancy state evolution covariance for source j
     domain: SPD(q)
     dimensions: matrix(q,q)
     indexing: t=1..T, j=1..J
     introduced: docs/derivations/sections/01_notation_and_model.tex:eq:B_delta
 
-  - symbol: W_t_beta
-    latex: \bm W_t^\beta
-    meaning: Reduced Model C lead-specific forecast evolution covariance
-    domain: SPD(q(1+J_f))
-    dimensions: matrix(q(1+J_f),q(1+J_f))
-    indexing: t=T+1..T+K
+  - symbol: W_{T+k}^{(f)}
+    latex: \bm W_{T+k}^{(f)}
+    meaning: Lead-specific forecast transition covariance
+    domain: SPD(d_k^{(f)})
+    dimensions: matrix(d_k^{(f)},d_k^{(f)})
+    indexing: k=1..K_max
     introduced: docs/derivations/sections/01_notation_and_model.tex:eq:C_state
 
   - symbol: sigma_j^2
@@ -183,13 +215,13 @@ symbols:
     indexing: t=1..T+K, n=1..n_t
     introduced: docs/derivations/sections/03_state_posterior_ffbs.tex:eq:lgssm_obs
 
-  - symbol: h_t
-    latex: \bm h_t
+  - symbol: b_t
+    latex: \bm b_t
     meaning: FFBS backward conditional mean
     domain: R^d
     dimensions: vector(d)
-    indexing: t=0..T-1
-    introduced: docs/derivations/sections/03_state_posterior_ffbs.tex:eq:ffbs_h
+    indexing: t=t_0..t_1-1
+    introduced: docs/derivations/sections/03_state_posterior_ffbs.tex:eq:ffbs_b
 
   - symbol: r_{t,n}
     latex: r_{t,n}

@@ -3,8 +3,8 @@
 \subsection{Definition}
 \begin{align}
 \ELBO(q)
-&:= \E_q[\log p(\text{data},\text{states},\sigma^2,W)]
--\E_q[\log q(\text{states},\sigma^2,W)].
+&:= \E_q[\log p(\text{data},\text{states},\sigma^2,W^{(f)})]
+-\E_q[\log q(\text{states},\sigma^2,W^{(f)})].
 \label{eq:elbo_def}
 \end{align}
 
@@ -16,15 +16,16 @@
 +\mathcal{L}_{\text{trans,fcast}}
 +\mathcal{L}_{\text{init}}
 +\mathcal{L}_{\text{priors},\sigma}
-+\mathcal{L}_{\text{priors},W,\mathrm{hist}}
 +\mathcal{L}_{\text{priors},W,\mathrm{fcast}} \nonumber\\
 &\qquad
 +\mathcal{H}_{\text{states}}
 +\sum_j\mathcal{H}_{\sigma_j^2}
-+\sum_{b\in\mathcal{B}_{\mathrm{hist}}}\mathcal{H}_{W_b}
 +\sum_{k=1}^{K_{\max}}\mathcal{H}_{W_{T+k}^{(f)}}.
 \label{eq:elbo_blocks}
 \end{align}
+Because $\lambda$ is fixed, there is no prior, entropy, or variational term involving $\lambda$.
+Likewise, there are no covariance-prior or covariance-entropy terms for the historical
+discount-induced covariances because those are deterministic known inputs.
 
 Likelihood block with scalar Gaussian observations:
 \begin{align}
@@ -39,19 +40,26 @@ N_j\log(2\pi)
 In ragged-horizon Model C, each $N_j$ is the source-specific count over active leads
 $k\le K_j$ (not a shared-horizon count).
 
-Historical transition block for each shared covariance block $b\in\mathcal{B}_{\mathrm{hist}}$:
+Historical transition block with known time-varying discount-induced covariances:
 \begin{align}
-\mathcal{L}_{\text{trans,hist},b}
-= -\frac12\left(
-T_bd_b\log(2\pi)
-+T_b\E_q[\log|\bm W_b|]
-+\sum_{t=1}^{T_b}\tr\left(\E_q[\bm W_b^{-1}]\E_q[\bm e_t\bm e_t^\T]\right)
+\mathcal{L}_{\text{trans,hist}}
+&= \mathcal{L}_{\text{trans,A}} + \sum_{j=1}^{J}\mathcal{L}_{\text{trans},\delta^j},
+\label{eq:elbo_trans_hist}\\
+\mathcal{L}_{\text{trans,A}}
+&= -\frac12\sum_{t=1}^{T}\left(
+(q+1+m)\log(2\pi)
++\log|\tilde{\bm W}_t|
++\tr\!\left(\tilde{\bm W}_t^{-1}\E_q[\bm e_t^A(\bm e_t^A)^\T]\right)
+\right),
+\label{eq:elbo_trans_hist_A}\\
+\mathcal{L}_{\text{trans},\delta^j}
+&= -\frac12\sum_{t=1}^{T}\left(
+q\log(2\pi)
++\log|\bm W_t^{\delta^j}|
++\tr\!\left((\bm W_t^{\delta^j})^{-1}\E_q[\bm e_t^{\delta,j}(\bm e_t^{\delta,j})^\T]\right)
 \right).
-\label{eq:elbo_trans_hist_block}
+\label{eq:elbo_trans_hist_delta}
 \end{align}
-\[
-\mathcal{L}_{\text{trans,hist}}=\sum_{b\in\mathcal{B}_{\mathrm{hist}}}\mathcal{L}_{\text{trans,hist},b}.
-\]
 
 Forecast transition block with one lead-specific covariance per forecast time:
 \begin{align}
@@ -68,16 +76,30 @@ This term is a sum over forecast leads because the model assigns an independent
 covariance matrix to each forecast transition.
 
 \subsection{Computable Prior and Entropy Blocks}
-Let $d_b$ denote the dimension of historical covariance block $b$, let $d_k^{(f)}$
+Let $d_k^{(f)}$
 denote the dimension of the forecast state at lead $k$, and let
-$c_{\IW}(\nu,\bm S)$ denote the inverse-Wishart normalizing constant.
+$c_{\IW}(\nu,\bm S)$ denote the inverse-Wishart normalizing constant
+\begin{align}
+c_{\IW}(\nu,\bm S)
+:=
+\frac{|\bm S|^{\nu/2}}{2^{\nu d/2}\Gamma_d(\nu/2)},
+\label{eq:iw_norm_const}
+\end{align}
+where $d$ is the dimension of $\bm S$ and $\Gamma_d(\cdot)$ is the multivariate gamma function.
 Then the remaining ELBO terms are computed as:
 \begin{align}
 \mathcal{L}_{\text{init}}
 &=
--\frac{p_0}{2}\log(2\pi)
--\frac12\log|\bm C_0|
--\frac12\tr\!\left(\bm C_0^{-1}\E_q[(\bm x_0-\bm m_0)(\bm x_0-\bm m_0)^\T]\right), \label{eq:elbo_init_block}\\
+\sum_{g\in\mathcal G_{\mathrm{init}}}
+\mathcal{L}_{\text{init},g},
+\label{eq:elbo_init_block}\\
+\mathcal{L}_{\text{init},g}
+&=
+-\frac{d_g}{2}\log(2\pi)
+-\frac12\log|\bm C_{g0}|
+-\frac12\tr\!\left(
+\bm C_{g0}^{-1}\E_q[(\bm x_{0}^{(g)}-\bm m_{g0})(\bm x_{0}^{(g)}-\bm m_{g0})^\T]
+\right), \label{eq:elbo_init_block_g}\\
 \mathcal{L}_{\text{priors},\sigma}
 &=
 \sum_{j=0}^{J}
@@ -86,13 +108,6 @@ a_{\sigma j}\log b_{\sigma j}-\log\Gamma(a_{\sigma j})
 -(a_{\sigma j}+1)\E_q[\log \sigma_j^2]
 -b_{\sigma j}\E_q[\sigma_j^{-2}]
 \right], \label{eq:elbo_prior_sigma_block}\\
-\mathcal{L}_{\text{priors},W,\mathrm{hist}}
-&=
-\sum_{b\in\mathcal{B}_{\mathrm{hist}}}\Big[
-\log c_{\IW}(\nu_b,\bm S_b)
--\frac{\nu_b+d_b+1}{2}\E_q[\log|\bm W_b|]
--\frac12\tr\!\big(\bm S_b\,\E_q[\bm W_b^{-1}]\big)
-\Big], \label{eq:elbo_prior_W_hist_block}\\
 \mathcal{L}_{\text{priors},W,\mathrm{fcast}}
 &=
 \sum_{k=1}^{K_{\max}}\Big[
@@ -102,17 +117,23 @@ a_{\sigma j}\log b_{\sigma j}-\log\Gamma(a_{\sigma j})
 -\frac12\tr\!\big(\bm S_{T+k}^{(f)}\,\E_q[(\bm W_{T+k}^{(f)})^{-1}]\big)
 \Big]. \label{eq:elbo_prior_W_fcast_block}
 \end{align}
+Here $\mathcal G_{\mathrm{init}}$ is the set of Gaussian-initialized state blocks.
+In the unified A+B+C model,
+\[
+\mathcal G_{\mathrm{init}}=\{\bm\alpha_0,\bm\delta_0^1,\dots,\bm\delta_0^J\},
+\]
+because the forecast initial state is imposed by the deterministic bridge \eqref{eq:fcast_bridge}
+and contributes no separate Gaussian prior term.
+If standalone Model C is run with external anchor $\bm x_T^{(f)}\sim\N(\bm m_{f0},\bm C_{f0})$,
+include that anchor as an additional element of $\mathcal G_{\mathrm{init}}$.
+There are no prior or entropy blocks for the historical transition covariances because
+those matrices are deterministic discount-induced inputs and not random variables under $q$.
 Entropy blocks are
 \begin{align}
 \mathcal{H}_{\sigma_j^2}
 &=
 \tilde a_{\sigma j}+\log \tilde b_{\sigma j}+\log\Gamma(\tilde a_{\sigma j})
 -(1+\tilde a_{\sigma j})\psi(\tilde a_{\sigma j}), \label{eq:elbo_entropy_sigma}\\
-\mathcal{H}_{W_b}
-&=
--\log c_{\IW}(\tilde\nu_b,\tilde{\bm S}_b)
-+\frac{\tilde\nu_b+d_b+1}{2}\E_q[\log|\bm W_b|]
-+\frac12\tr\!\big(\tilde{\bm S}_b\,\E_q[\bm W_b^{-1}]\big), \label{eq:elbo_entropy_W_hist}\\
 \mathcal{H}_{W_{T+k}^{(f)}}
 &=
 -\log c_{\IW}(\tilde\nu_{T+k}^{(f)},\tilde{\bm S}_{T+k}^{(f)})
@@ -125,7 +146,9 @@ For the Gaussian state factor, use
 \mathcal{H}_{\text{states}}
 =\frac12\left(D_x\log(2\pi e)+\log|\bm\Sigma_x^\star|\right),
 \]
-where $D_x$ is the stacked state dimension and $\bm\Sigma_x^\star$ is the state-factor covariance.
+where $D_x$ is the total dimension of the stacked Gaussian state factor and
+$\bm\Sigma_x^\star$ is the corresponding state-factor covariance after enforcing any deterministic
+bridge constraints.
 
 \subsection{Convergence Criterion}
 Stop CAVI when

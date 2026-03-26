@@ -6,6 +6,11 @@ For $j=1,\dots,J$, $z_t^j\in\R$ denotes retrospective products;
 $y_t^0\in\R$ denotes the target series.
 Scope note: this document covers only Gaussian NDLM Models A--C in this repository;
 exAL augmentation and non-Gaussian likelihood extensions are intentionally excluded here.
+Forecast-producing sources are indexed as $j=1,\dots,J_f$ with $J_f\le J$; without loss of
+generality, take these to be the first $J_f$ retrospective sources after relabeling if needed.
+Historical transfer covariates are denoted $\bm c_t\in\R^m$, $t=1,\dots,T$.
+When transfer is propagated into the forecast phase, the supplied forecast-period covariate path is
+$\bm c_{T+k}^\star\in\R^m$, $k=1,\dots,K_{\max}$.
 
 Core latent components are
 \begin{align}
@@ -14,6 +19,14 @@ Core latent components are
 \bm\psi_t &\in \R^m, &
 \zeta_t &\in \R.
 \end{align}
+In the historical window, the evolution covariances
+\[
+\{\bm W_t^\theta,\bm W_t^\psi,\bm W_t^{\delta^j},w_t^\zeta\colon t=1,\dots,T,\; j=1,\dots,J\}
+\]
+are known time-varying deterministic quantities induced by the chosen discount-factor
+construction. The derivations treat these sequences as given inputs rather than stochastic
+unknowns. For block notation, write the scalar transfer innovation variance as the $1\times1$
+matrix $\bm W_t^\zeta:=[w_t^\zeta]\in\R^{1\times1}$.
 The stacked historical state is
 \begin{align}
 \bm\alpha_t &= (\bm\theta_t^\T,\zeta_t,\bm\psi_t^\T)^\T \in \R^{q+1+m}.
@@ -32,8 +45,8 @@ For $t=1,\dots,T$,
  &\sim \N(\tilde{\bm F}_t^\T \bm\alpha_t,\sigma_0^2), \label{eq:A_obs}\\
  \bm\theta_t \given \bm\theta_{t-1}
  &\sim \N(\bm G_t\bm\theta_{t-1},\bm W_t^\theta), \label{eq:A_theta}\\
- \zeta_t \given \zeta_{t-1},\bm\psi_t
- &\sim \N(\lambda\zeta_{t-1}+\bm x_t^\T\bm\psi_t,w_t^\zeta), \label{eq:A_zeta}\\
+ \zeta_t \given \zeta_{t-1},\bm\psi_{t-1}
+ &\sim \N(\lambda\zeta_{t-1}+\bm c_t^\T\bm\psi_{t-1},w_t^\zeta), \label{eq:A_zeta}\\
  \bm\psi_t \given \bm\psi_{t-1}
  &\sim \N(\bm\psi_{t-1},\bm W_t^\psi). \label{eq:A_psi}
 \end{align}
@@ -44,11 +57,11 @@ With
 \tilde{\bm G}_t &=
 \begin{bmatrix}
 \bm G_t & 0 & 0 \\
-0 & \lambda & \bm x_t^\T \\
+0 & \lambda & \bm c_t^\T \\
 0 & 0 & \bm I_m
 \end{bmatrix},
 &
-\tilde{\bm W}_t &= \BlockDiag(\bm W_t^\theta,w_t^\zeta,\bm W_t^\psi),
+\tilde{\bm W}_t &= \BlockDiag(\bm W_t^\theta,\bm W_t^\zeta,\bm W_t^\psi),
 \end{align}
 we have $\bm\alpha_t\given\bm\alpha_{t-1}\sim\N(\tilde{\bm G}_t\bm\alpha_{t-1},\tilde{\bm W}_t)$.
 Throughout this document, $\lambda$ is treated as a fixed known constant.
@@ -61,24 +74,97 @@ z_t^j \given \bm\alpha_t,\bm\delta_t^j,\sigma_j^2
 \bm\delta_t^j\given\bm\delta_{t-1}^j
 &\sim \N(\bm G_t\bm\delta_{t-1}^j,\bm W_t^{\delta^j}). \label{eq:B_delta}
 \end{align}
+The discrepancy evolution covariances $\bm W_t^{\delta^j}$ are also known deterministic
+discount-factor-induced inputs over the historical window.
 
 \subsection{Model C: Forecast Ensemble Likelihood (Gaussian)}
 For active forecasters $j=1,\dots,J_f$, members $i=1,\dots,I_j$, and
 source-specific horizons $K_j$, define
 \begin{align}
-\mathcal A_k &:= \{j: k\le K_j\}, \qquad J_k := |\mathcal A_k|, \qquad k=1,\dots,K_{\max},
+\mathcal A_k &:= \{j: k\le K_j\}, \qquad
+J_k := |\mathcal A_k|, \qquad
+n_k := \sum_{j\in\mathcal A_k} I_j, \qquad k=1,\dots,K_{\max},
 \end{align}
 with $K_{\max}:=\max_j K_j$ and reduced active-state dimension $p_k:=q(1+J_k)$.
-Model C is written in terms of a generic forecast state $\bm x_{T+k}^{(f)}\in\R^{d_k^{(f)}}$.
+Let $D_{\mathrm{red}}:=q(1+J_f)$ and $D_{\mathrm{aug}}:=q(1+J_f)+1+m$.
+For each lead $k$, define the source-order-preserving rank map
+$\rho_k:\mathcal A_k\to\{1,\dots,J_k\}$ and binary selection matrices
+\begin{align}
+\bm S_k^{\mathrm{red}} &\in \{0,1\}^{p_k\times D_{\mathrm{red}}}, &
+\bm S_k^{\mathrm{aug}} &\in \{0,1\}^{(p_k+1+m)\times D_{\mathrm{aug}}},
+\end{align}
+with injections $\bm L_k^{\mathrm{red}}:=(\bm S_k^{\mathrm{red}})^\T$ and
+$\bm L_k^{\mathrm{aug}}:=(\bm S_k^{\mathrm{aug}})^\T$.
+Model C is written in terms of a generic active forecast state
+$\bm x_{T+k}^{(f)}\in\R^{d_k^{(f)}}$.
 Two coherent specifications are supported:
 \begin{enumerate}
-\item Reduced forecast state: $\bm x_{T+k}^{(f)}=\bm\beta_{T+k}^{\mathrm{act}}$ with dimension
-      $d_k^{(f)}=p_k$ (or the equivalent fixed-dimension embedding $\bm\beta_{T+k}\in\R^{q(1+J_f)}$).
-\item Augmented forecast state: $\bm x_{T+k}^{(f)}=\widetilde{\bm\beta}_{T+k}^{\mathrm{act}}$
-      with dimension $d_k^{(f)}=p_k+1+m$ (or the equivalent fixed-dimension embedding
-      $\widetilde{\bm\beta}_{T+k}\in\R^{q(1+J_f)+1+m}$), conditional on a supplied forecast-period
-      covariate path $\bm x_{T+k}^\star\in\R^m$.
+\item Reduced forecast state:
+\begin{align}
+\bm x_{T+k}^{(f)}=\bm\beta_{T+k}^{\mathrm{act}}
+:=\bm S_k^{\mathrm{red}}\bm\beta_{T+k}\in\R^{p_k},
+\qquad d_k^{(f)}=p_k.
+\end{align}
+\item Augmented forecast state:
+\begin{align}
+\bm x_{T+k}^{(f)}=\widetilde{\bm\beta}_{T+k}^{\mathrm{act}}
+:=\bm S_k^{\mathrm{aug}}\widetilde{\bm\beta}_{T+k}\in\R^{p_k+1+m},
+\qquad d_k^{(f)}=p_k+1+m,
+\end{align}
+conditional on the supplied forecast-period covariate path
+$\bm c_{T+k}^\star\in\R^m$.
 \end{enumerate}
+For each active source $j\in\mathcal A_k$, the reduced forecast design is
+\begin{align}
+\bm h_{T+k,j}^{\mathrm{red}}
+:=
+\left[
+\bm F_{T+k}^\T,\;
+\bm 0_q^\T,\dots,\bm 0_q^\T,\;
+\bm F_{T+k}^\T,\;
+\bm 0_q^\T,\dots,\bm 0_q^\T
+\right]^\T \in \R^{p_k},
+\label{eq:C_h_red}
+\end{align}
+with the second nonzero $q$-block placed at active discrepancy rank $\rho_k(j)$.
+The augmented forecast design is
+\begin{align}
+\bm h_{T+k,j}^{\mathrm{aug}}
+:=
+\left[(\bm h_{T+k,j}^{\mathrm{red}})^\T,\;1,\;\bm 0_m^\T\right]^\T
+\in \R^{p_k+1+m}.
+\label{eq:C_h_aug}
+\end{align}
+Define the fixed-dimension embedded reduced transition mean matrix
+\begin{align}
+\bar{\bm M}_{T+k}^{\mathrm{red}}
+:=
+\BlockDiag\!\big(
+\bm G_{T+k},
+\underbrace{\bm G_{T+k},\dots,\bm G_{T+k}}_{J_f\text{ discrepancy blocks}}
+\big)\in\R^{D_{\mathrm{red}}\times D_{\mathrm{red}}},
+\label{eq:C_M_red_emb}
+\end{align}
+and the embedded augmented transition mean matrix
+\begin{align}
+\bar{\bm M}_{T+k}^{\mathrm{aug}}
+:=
+\begin{bmatrix}
+\bar{\bm M}_{T+k}^{\mathrm{red}} & 0 & 0 \\
+0 & \lambda & (\bm c_{T+k}^\star)^\T \\
+0 & 0 & \bm I_m
+\end{bmatrix}\in\R^{D_{\mathrm{aug}}\times D_{\mathrm{aug}}}.
+\label{eq:C_M_aug_emb}
+\end{align}
+The active reduced and augmented transition mean maps are then
+\begin{align}
+\bm M_{T+k}^{\mathrm{red}}
+&:= \bm S_k^{\mathrm{red}}\bar{\bm M}_{T+k}^{\mathrm{red}}\bm L_{k-1}^{\mathrm{red}}
+\in \R^{p_k\times p_{k-1}}, \label{eq:C_M_red}\\
+\bm M_{T+k}^{\mathrm{aug}}
+&:= \bm S_k^{\mathrm{aug}}\bar{\bm M}_{T+k}^{\mathrm{aug}}\bm L_{k-1}^{\mathrm{aug}}
+\in \R^{(p_k+1+m)\times(p_{k-1}+1+m)}. \label{eq:C_M_aug}
+\end{align}
 For each lead $k=1,\dots,K_{\max}$ and each active source $j\in\mathcal A_k$,
 \begin{align}
  y_T^{j,i}(k) \given \bm x_{T+k}^{(f)},\sigma_j^2
@@ -86,13 +172,39 @@ For each lead $k=1,\dots,K_{\max}$ and each active source $j\in\mathcal A_k$,
  \bm x_{T+k}^{(f)}\given\bm x_{T+k-1}^{(f)},\bm W_{T+k}^{(f)}
  &\sim \N\!\big(\bm M_{T+k}^{(f)}\bm x_{T+k-1}^{(f)},\bm W_{T+k}^{(f)}\big). \label{eq:C_state}
 \end{align}
-In the reduced specification, $(\bm h_{T+k,j}^{(f)},\bm M_{T+k}^{(f)})$
-specialize to $(\bm e_{T+k,j+1},\bm M_{T+k},\bm W_{T+k}^\beta)$ from the original
-no-transfer Model C. In the augmented specification, $\bm h_{T+k,j}^{(f)}$ and
-$\bm M_{T+k}^{(f)}$ are enlarged to retain the transfer block, with $\lambda$ entering
-only through the deterministic transition mean and $\bm x_{T+k}^\star$ treated as supplied.
+In the reduced specification,
+$(\bm h_{T+k,j}^{(f)},\bm M_{T+k}^{(f)})=(\bm h_{T+k,j}^{\mathrm{red}},\bm M_{T+k}^{\mathrm{red}})$.
+In the augmented specification,
+$(\bm h_{T+k,j}^{(f)},\bm M_{T+k}^{(f)})=(\bm h_{T+k,j}^{\mathrm{aug}},\bm M_{T+k}^{\mathrm{aug}})$.
+Thus, $\lambda$ enters only through deterministic transition means and is never a stochastic state.
 Each forecast lead has its own covariance matrix $\bm W_{T+k}^{(f)}$; there is no shared
-forecast covariance pooled across leads.
+forecast covariance pooled across leads. No discount-factor shortcut is assumed for these
+forecast-period covariances.
+
+\subsection{Historical-to-Forecast Bridge}
+The unified A+B+C model anchors the forecast state at time $T$ by deterministic embedding of the
+terminal historical states. Define
+\begin{align}
+\bm H_T^{\mathrm{red}}(\bm\alpha_T,\bm\delta_T^{1:J_f})
+&:= \bm\beta_T
+= (\bm\theta_T^\T,(\bm\delta_T^1)^\T,\dots,(\bm\delta_T^{J_f})^\T)^\T, \\
+\bm H_T^{\mathrm{aug}}(\bm\alpha_T,\bm\delta_T^{1:J_f})
+&:= \widetilde{\bm\beta}_T
+= (\bm\beta_T^\T,\zeta_T,\bm\psi_T^\T)^\T.
+\end{align}
+Then
+\begin{align}
+\bm x_T^{(f)}=
+\begin{cases}
+\bm H_T^{\mathrm{red}}(\bm\alpha_T,\bm\delta_T^{1:J_f}), & \text{reduced specification},\\
+\bm H_T^{\mathrm{aug}}(\bm\alpha_T,\bm\delta_T^{1:J_f}), & \text{augmented specification}.
+\end{cases}
+\label{eq:fcast_bridge}
+\end{align}
+If Model C is analyzed conditionally as a standalone forecast block, this deterministic bridge may be
+replaced by an externally supplied Gaussian anchor $\N(\bm m_{f0},\bm C_{f0})$.
+Whenever that shortcut is used, it is an external conditioning device rather than part of the unified
+joint model.
 
 \subsection{Observation List Representation (Computable Form)}
 At each time $t$, index scalar observations by $n=1,\dots,n_t$:
@@ -100,24 +212,32 @@ At each time $t$, index scalar observations by $n=1,\dots,n_t$:
 y_{t,n} \given \bm x_t &\sim \N(\bm h_{t,n}^\T\bm x_t,r_{t,n}), \label{eq:obs_list}
 \end{align}
 with $(\bm x_t,\bm h_{t,n},r_{t,n})=(\bm\alpha_t,\tilde{\bm F}_t,\sigma_0^2)$ for target,
-$(\bm\alpha_t\oplus\bm\delta_t^j,\tilde{\bm h}_{t,n},\sigma_j^2)$ for retrospective products,
+$(\bm\alpha_t\oplus\bm\delta_t^j,\tilde{\bm h}_{t,j},\sigma_j^2)$ for retrospective products, where
+\begin{align}
+\tilde{\bm h}_{t,j}:=[\tilde{\bm F}_t^\T,\bm F_t^\T]^\T,
+\end{align}
 and $(\bm x_t^{(f)},\bm h_{t,n}^{(f)},\sigma_j^2)$ for forecast members.
+Let $\mathrm{src}(t,n)\in\{0,1,\dots,J\}$ denote the source index attached to observation $(t,n)$.
 When only one observation is present, $y_t$ denotes the single-observation case $y_{t,1}$.
 
 \subsection{Prior Block}
 Default priors (conjugate where available) are
 \begin{align}
 \sigma_j^2 &\sim \IG(a_{\sigma j},b_{\sigma j}),\qquad j=0,\dots,J, \label{eq:prior_sigma}\\
-\bm W_b &\sim \IW(\nu_b,\bm S_b),\qquad b\in\{\theta,\psi,\delta^1,\dots,\delta^J\}, \label{eq:prior_W}\\
 \bm W_{T+k}^{(f)} &\sim \IW(\nu_{T+k}^{(f)},\bm S_{T+k}^{(f)}),\qquad k=1,\dots,K_{\max}, \label{eq:prior_W_fcast}\\
 \lambda &\text{ is treated as a fixed known constant.} \label{eq:lambda_fixed}
 \end{align}
+There are no priors on the historical evolution covariances
+$\tilde{\bm W}_t$ and $\{\bm W_t^{\delta^j}\}_{j=1}^J$ because those objects are deterministic
+outputs of the discount-factor specification.
 The forecast covariances $\{\bm W_{T+k}^{(f)}\}_{k=1}^{K_{\max}}$ are independent across leads
 under the prior.
-Initial states are Gaussian with fixed hyperparameters:
+Historical initial states are Gaussian with fixed hyperparameters:
 \begin{align}
 \bm\alpha_0&\sim\N(\bm m_{\alpha0},\bm C_{\alpha0}), \\
-\bm\delta_0^j&\sim\N(\bm m_{\delta0}^j,\bm C_{\delta0}^j), \qquad j=1,\dots,J, \\
-\bm x_T^{(f)}&\sim\N(\bm m_{f0},\bm C_{f0}),
+\bm\delta_0^j&\sim\N(\bm m_{\delta0}^j,\bm C_{\delta0}^j), \qquad j=1,\dots,J,
 \end{align}
-where $\bm x_T^{(f)}$ denotes the chosen reduced or augmented forecast initial state.
+and, in the unified model, the forecast initial state is the deterministic bridge
+\eqref{eq:fcast_bridge}.
+If standalone Model C analysis is desired, replace the bridge by the external Gaussian anchor
+$\bm x_T^{(f)}\sim\N(\bm m_{f0},\bm C_{f0})$.

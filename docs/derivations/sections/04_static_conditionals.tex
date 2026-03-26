@@ -1,4 +1,4 @@
-\section{Full Conditionals for Variance and Covariance Parameters}
+\section{Full Conditionals for Random Variance and Forecast-Covariance Parameters}
 
 \subsection{Observation Variances: Inverse-Gamma}
 For each source $j\in\{0,\dots,J\}$, let $\mathcal{I}_j$ index all observations driven by $\sigma_j^2$,
@@ -14,17 +14,20 @@ Under $\sigma_j^2\sim\IG(a_{\sigma j},b_{\sigma j})$,
 \label{eq:cond_sigma}
 \end{align}
 
-\subsection{Historical Shared Evolution Covariances: Inverse-Wishart}
-For any historical Gaussian transition block shared across $T_b$ transitions, with innovations
-$\bm e_t=\bm x_t-\bm G_t\bm x_{t-1}\in\R^{d_b}$ and prior
-$\bm W_b\sim\IW(\nu_b,\bm S_b)$,
-\begin{align}
-\bm W_b\given\text{rest}
-\sim\IW\left(\nu_b+T_b,\;\bm S_b+\sum_{t=1}^{T_b}\bm e_t\bm e_t^\T\right).
-\label{eq:cond_W_hist}
-\end{align}
-This covers the time-constant historical covariance blocks such as
-$\bm W^\theta$, $\bm W^\psi$, and $\bm W^{\delta^j}$ when they are learned rather than fixed.
+\subsection{Historical Evolution Covariances: No Full Conditionals}
+The historical evolution covariances
+\[
+\{\tilde{\bm W}_t,\bm W_t^{\delta^j}\colon t=1,\dots,T,\; j=1,\dots,J\}
+\]
+are deterministic time-varying inputs produced by the discount-factor construction.
+Therefore:
+\begin{itemize}
+\item they have no prior distributions in this model,
+\item they have no Gibbs full conditionals,
+\item they have no variational factors,
+\item they contribute to the historical transition likelihood only through the known quadratic
+      forms in \eqref{eq:log_joint_A} and \eqref{eq:log_joint_B}.
+\end{itemize}
 
 \subsection{Forecast Lead-Specific Covariances: Exact Inverse-Wishart Updates}
 Choose either the reduced or augmented forecast-state specification from Section~1.

@@ -6,7 +6,13 @@ Conditioning on static parameters, each model block reduces to
 \bm x_t\given\bm x_{t-1} &\sim \N(\bm G_t\bm x_{t-1},\bm Q_t), \label{eq:lgssm_state}\\
 y_{t,n}\given\bm x_t &\sim \N(\bm h_{t,n}^\T\bm x_t,r_{t,n}),\quad n=1,\dots,n_t. \label{eq:lgssm_obs}
 \end{align}
-Here $\bm x_t$ is whichever stacked state is active ($\bm\alpha_t$, $\bm\beta_t$, or block-stacked variants).
+Here $\bm x_t$ is whichever stacked state is active ($\bm\alpha_t$,
+$\bm\beta_t^{\mathrm{act}}$, $\widetilde{\bm\beta}_t^{\mathrm{act}}$, or a joint stacked state).
+For historical Model A/B transitions, $\bm Q_t$ is the known time-varying discount-induced
+covariance (for example, $\tilde{\bm W}_t$ or $\bm W_t^{\delta^j}$). For forecast Model C
+transitions, $\bm Q_{T+k}^{(f)}$ is either the sampled lead-specific covariance
+$\bm W_{T+k}^{(f)}$ in Gibbs or the VB pseudo-covariance derived from
+$\E_q[(\bm W_{T+k}^{(f)})^{-1}]$.
 
 \subsection{Sequential Kalman Assimilation at Fixed Time}
 Prediction:
@@ -16,8 +22,8 @@ Prediction:
 \end{align}
 For each scalar observation $(y_{t,n},\bm h_{t,n},r_{t,n})$:
 \begin{align}
-f_{t,n} &= \bm h_{t,n}^\T \bm R_{t,n-1}\bm h_{t,n}+r_{t,n}, \label{eq:kf_f}\\
-\bm K_{t,n} &= \bm R_{t,n-1}\bm h_{t,n} f_{t,n}^{-1}, \label{eq:kf_K}\\
+f_{t,n} &= \bm h_{t,n}^\T \bm C_{t,n-1}\bm h_{t,n}+r_{t,n}, \label{eq:kf_f}\\
+\bm K_{t,n} &= \bm C_{t,n-1}\bm h_{t,n} f_{t,n}^{-1}, \label{eq:kf_K}\\
 \bm m_{t,n} &= \bm m_{t,n-1}+\bm K_{t,n}(y_{t,n}-\bm h_{t,n}^\T\bm m_{t,n-1}), \label{eq:kf_m}\\
 \bm C_{t,n} &= \bm C_{t,n-1}-\bm K_{t,n}\bm h_{t,n}^\T\bm C_{t,n-1}. \label{eq:kf_C}
 \end{align}
@@ -27,14 +33,17 @@ Thus, the second index $n$ denotes within-time assimilation stage, while
 $(\bm m_t,\bm C_t)$ denote post-assimilation filtered moments at time $t$.
 
 \subsection{FFBS Simulation Smoother}
-Backward simulation starts at $\bm x_T\sim\N(\bm m_T,\bm C_T)$.
-For $t=T-1,\dots,0$,
+For any block indexed by $t=t_0,\dots,t_1$, backward simulation starts at
+$\bm x_{t_1}\sim\N(\bm m_{t_1},\bm C_{t_1})$.
+For $t=t_1-1,\dots,t_0$,
 \begin{align}
 \bm B_t &= \bm C_t\bm G_{t+1}^\T\bm R_{t+1}^{-1}, \label{eq:ffbs_B}\\
-\bm h_t &= \bm m_t + \bm B_t(\bm x_{t+1}-\bm a_{t+1}), \label{eq:ffbs_h}\\
+\bm b_t &= \bm m_t + \bm B_t(\bm x_{t+1}-\bm a_{t+1}), \label{eq:ffbs_b}\\
 \bm H_t &= \bm C_t - \bm B_t\bm R_{t+1}\bm B_t^\T, \label{eq:ffbs_H}\\
-\bm x_t\given\bm x_{t+1},\text{data},\Theta &\sim \N(\bm h_t,\bm H_t). \label{eq:ffbs_cond}
+\bm x_t\given\bm x_{t+1},\text{data},\Theta &\sim \N(\bm b_t,\bm H_t). \label{eq:ffbs_cond}
 \end{align}
+This notation applies unchanged to the historical blocks and to the forecast block
+$t=T,\dots,T+K_{\max}$.
 
 \subsection{Computability Constraints}
 All updates use Cholesky solves of $f_{t,n}$ (scalar) or small SPD matrices.
@@ -47,6 +56,8 @@ Two equivalent implementations are valid:
 \begin{enumerate}
 \item True transdimensional recursion in $\R^{d_k^{(f)}}$ with lead-dependent
       $(\bm M_{T+k}^{(f)},\bm Q_{T+k}^{(f)},\bm h_{T+k,n}^{(f)})$, where
+      $\bm M_{T+k}^{(f)}\in\R^{d_k^{(f)}\times d_{k-1}^{(f)}}$ and
+      $\bm Q_{T+k}^{(f)}\in\R^{d_k^{(f)}\times d_k^{(f)}}$,
       $d_k^{(f)}=p_k$ in the reduced specification and $d_k^{(f)}=p_k+1+m$
       in the augmented specification.
 \item Fixed-dimension embedding in $\R^{q(1+J_f)}$ (reduced) or
@@ -57,6 +68,24 @@ Two equivalent implementations are valid:
 The fixed-dimension form is algebraically equivalent to the transdimensional form
 provided inactive coordinates are projected out of both the measurement operators and
 the state innovation terms at each lead.
+Concretely, if $\bar{\bm x}_{T+k}^{(f)}$ denotes the embedded state, then
+\begin{align}
+\bm x_{T+k}^{(f)} &= \bm S_k^{(f)}\bar{\bm x}_{T+k}^{(f)}, \\
+\bar{\bm h}_{T+k,n}^{(f)} &= (\bm S_k^{(f)})^\T \bm h_{T+k,n}^{(f)}, \\
+\bar{\bm x}_{T+k}^{(f)} &= \bar{\bm M}_{T+k}^{(f)}\bar{\bm x}_{T+k-1}^{(f)} + \bm L_k^{(f)}\bm\eta_{T+k}^{(f)},
+\qquad
+\bm\eta_{T+k}^{(f)}\sim\N(\bm 0,\bm W_{T+k}^{(f)}),
+\end{align}
+with $\bm L_k^{(f)}=(\bm S_k^{(f)})^\T$ and embedded innovation covariance
+$\bar{\bm Q}_{T+k}^{(f)}=\bm L_k^{(f)}\bm W_{T+k}^{(f)}(\bm L_k^{(f)})^\T$.
+Here $\bm S_k^{(f)}$ denotes either $\bm S_k^{\mathrm{red}}$ or $\bm S_k^{\mathrm{aug}}$
+according to the chosen forecast-state specification.
+This covariance is generally singular off the active subspace, so an exact fixed-dimension
+implementation must either support singular process noise directly or operate with the
+reduced active state.
+In the unified A+B+C model, the forecast recursion starts from the deterministic bridge
+\eqref{eq:fcast_bridge}; in standalone Model C analysis, replace that bridge by the external
+Gaussian anchor described in Section~1.
 For Gibbs updates, $\bm Q_{T+k}^{(f)}$ is the sampled lead-specific covariance
 $\bm W_{T+k}^{(f)}$.
 For mean-field VB, the pseudo-transition at lead $T+k$ uses the precision

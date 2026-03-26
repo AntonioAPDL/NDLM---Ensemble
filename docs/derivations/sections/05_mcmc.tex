@@ -3,23 +3,26 @@
 One Gibbs sweep for the Gaussian NDLM proceeds as follows.
 Each step is evaluated from the computable kernels in
 \eqref{eq:log_joint_A}--\eqref{eq:log_joint_C} and the conditional families in
-\eqref{eq:cond_sigma}, \eqref{eq:cond_W_hist}, and \eqref{eq:cond_W_fcast}.
+\eqref{eq:cond_sigma} and \eqref{eq:cond_W_fcast}.
 Because $\lambda$ is fixed, there is no separate update for the transfer rate.
+If the unified A+B+C model is fit jointly, the forecast block is anchored by the deterministic
+bridge \eqref{eq:fcast_bridge}; if standalone Model C is fit conditionally, replace that bridge by
+the external Gaussian anchor from Section~1.
 
 \begin{enumerate}[label=\textbf{Step \arabic*:},leftmargin=2.8cm]
 \item Sample state trajectories using FFBS:
 \begin{align*}
-\bm x_{0:T}^{(s)} \sim p(\bm x_{0:T}\given\text{data},\Theta^{(s-1)}),
+\bm x_{t_0:t_1}^{(s)} \sim p(\bm x_{t_0:t_1}\given\text{data},\Theta^{(s-1)}),
 \end{align*}
 with block choice either joint stacked state or conditional blocks.
+Historical blocks use the known time-varying discount-induced covariances
+$\tilde{\bm W}_t$ and $\bm W_t^{\delta^j}$.
 If Model C is active, the forecast FFBS block is run on
 $\bm x_{T:T+K_{\max}}^{(f)}$ using the current lead-specific
-$\{\bm W_{T+k}^{(f)}\}_{k=1}^{K_{\max}}$.
+$\{\bm W_{T+k}^{(f)}\}_{k=1}^{K_{\max}}$ and the reduced or augmented state specification selected
+in Section~1.
 
 \item Update observation variances for each source $j$ using \eqref{eq:cond_sigma}.
-
-\item Update historical shared evolution covariance blocks using \eqref{eq:cond_W_hist}
-(or skip when those covariances are fixed).
 
 \item Update each forecast lead-specific covariance
 $\bm W_{T+k}^{(f)}$ independently using \eqref{eq:cond_W_fcast}.
@@ -34,9 +37,10 @@ and current state draws:
 \]
 \item Draw state paths by FFBS with \eqref{eq:kf_f}--\eqref{eq:ffbs_cond},
 assimilating all observations at each time in observation-list order.
+\item If the unified A+B+C model is used, enforce the deterministic forecast initial condition
+$\bm x_T^{(f)}=\bm H_T^{(f)}(\bm\alpha_T,\bm\delta_T^{1:J_f})$ before propagating the forecast FFBS
+block.
 \item Draw each $\sigma_j^2$ from \eqref{eq:cond_sigma} using the updated $\mathrm{SSE}_j$.
-\item Draw each historical shared covariance block from \eqref{eq:cond_W_hist}
-using innovation outer products $\bm e_t\bm e_t^\T$ computed from the updated state paths.
 \item For each forecast lead $k$, compute
 $\bm u_{T+k}^{(f)}(\bm u_{T+k}^{(f)})^\T$ from \eqref{eq:fcast_innovation}
 and draw $\bm W_{T+k}^{(f)}$ from \eqref{eq:cond_W_fcast}.
@@ -49,7 +53,9 @@ Track and report:
 \begin{itemize}
 \item Effective sample size and trace stability for each $\sigma_j^2$ and for representative
       scalar summaries of $\bm W_{T+k}^{(f)}$ (for example, diagonal entries or log-determinants).
-\item Innovation quadratic forms $\bm e_t^\T\bm W_b^{-1}\bm e_t$ and
+\item Historical innovation quadratic forms using the known discount-induced covariances, namely
+      $(\bm e_t^A)^\T\tilde{\bm W}_t^{-1}\bm e_t^A$ and
+      $(\bm e_t^{\delta,j})^\T(\bm W_t^{\delta^j})^{-1}\bm e_t^{\delta,j}$, and forecast innovation quadratic forms
       $(\bm u_{T+k}^{(f)})^\T(\bm W_{T+k}^{(f)})^{-1}\bm u_{T+k}^{(f)}$.
 \item Posterior predictive calibration at historical holdout points.
 \end{itemize}

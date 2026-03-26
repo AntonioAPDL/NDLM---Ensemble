@@ -33,9 +33,16 @@ Equation \eqref{eq:sse_decomposition} enables streaming IG updates while retaini
 \subsection{Forecast Synthesis for Target}
 At forecast time $t=T+k$, define synthesized target signal as
 \begin{align}
-\mu_t^{0,\mathrm{syn}} = \bm f_t^{0\T}\bm\theta_t
-\quad\text{or}\quad
-\mu_t^{0,\mathrm{syn}} = \tilde{\bm f}_t^{0\T}\bm\alpha_t,
+\mu_{T+k}^{0,\mathrm{syn}}
+&=
+\left[\bm F_{T+k}^\T,\bm 0_{qJ_k}^\T\right]\bm\beta_{T+k}^{\mathrm{act}}
+\qquad\text{(reduced forecast state)}, \label{eq:target_syn_red}\\
+\mu_{T+k}^{0,\mathrm{syn}}
+&=
+\left[\bm F_{T+k}^\T,\bm 0_{qJ_k}^\T,1,\bm 0_m^\T\right]\widetilde{\bm\beta}_{T+k}^{\mathrm{act}}
+\qquad\text{(augmented forecast state)}. \label{eq:target_syn_aug}
 \end{align}
-according to whether transfer terms are propagated into the forecast phase.
+In the embedded fixed-dimension representation, replace the active forecast states above by the
+selected states $\bm S_k^{\mathrm{red}}\bm\beta_{T+k}$ or
+$\bm S_k^{\mathrm{aug}}\widetilde{\bm\beta}_{T+k}$ from Section~1.
 Posterior summaries follow directly from MCMC draws or VB moments.

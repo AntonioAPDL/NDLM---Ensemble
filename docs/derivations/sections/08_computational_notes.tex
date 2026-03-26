@@ -6,14 +6,30 @@ $(t,n,y_{t,n},\bm h_{t,n},r_{t,n},\text{source}(n))$.
 This enforces a unique mapping from each observation to its variance parameter
 $\sigma_j^2$.
 
+\subsection{Mixed Covariance Semantics}
+The model uses two different covariance semantics and they must not be mixed:
+\begin{itemize}
+\item Historical A/B evolution covariances are deterministic time-varying outputs of the
+      discount-factor construction. They are inputs to filtering, smoothing, Gibbs, VB, and ELBO
+      evaluation; they are not random variables.
+\item Forecast Model C evolution covariances are random lead-specific matrices
+      $\bm W_{T+k}^{(f)}$, one per lead, with inverse-Wishart priors and exact Gibbs/VB updates.
+\item $\lambda$ is fixed and known everywhere.
+\end{itemize}
+
 \subsection{Numerical Stability Rules}
 \begin{itemize}
 \item Use Cholesky solves, never explicit matrix inversion.
 \item Symmetrize covariance updates: replace $\bm C\leftarrow(\bm C+\bm C^\T)/2$ after updates.
 \item Floor scalar variances at a positive tolerance in implementations.
+\item Historical transition covariances should be constructed before inference and passed into the
+      filter/smoother with the correct time index.
 \item In VB, form forecast pseudo-covariances from
       $\E_q[(\bm W_{T+k}^{(f)})^{-1}]$; do not substitute $\E_q[\bm W_{T+k}^{(f)}]$
       into the state update or ELBO.
+\item If the fixed-dimension embedded forecast state is used, preserve exactness by injecting
+      process noise only through the active-state subspace at each lead; equivalently, do not
+      give inactive coordinates artificial innovation variance.
 \end{itemize}
 
 \subsection{Reduction Checks}
@@ -29,12 +45,21 @@ The derivations must reduce to known special cases:
 \subsection{Required Unit-Level Validations}
 \begin{itemize}
 \item Gaussian likelihood normalizes to one for each source.
-\item IG and IW conditional kernels match conjugate updates for both historical shared blocks and
-      the lead-specific forecast covariances $\bm W_{T+k}^{(f)}$.
+\item IG conditional kernels match the observation-variance updates, and IW conditional kernels
+      match the lead-specific forecast covariance updates $\bm W_{T+k}^{(f)}$.
+\item Historical transition densities use the correct known time-varying discount-induced
+      covariances $\tilde{\bm W}_t$ and $\bm W_t^{\delta^j}$ with no inferred historical
+      covariance blocks.
 \item Kalman/FFBS moments match brute-force Gaussian conditioning on toy systems with
       time-varying forecast transition covariances.
 \item VB forecast pseudo-precisions use $\E_q[(\bm W_{T+k}^{(f)})^{-1}]$ and not
       $\E_q[\bm W_{T+k}^{(f)}]$.
+\item The deterministic bridge \eqref{eq:fcast_bridge} is respected exactly in Gibbs, VB, and
+      predictive calculations for the unified A+B+C model.
+\item No inference routine introduces a posterior update, variational factor, or ELBO term for
+      $\lambda$.
+\item Reduced and augmented forecast-state implementations agree after applying the appropriate
+      selection/injection maps and forecast design vectors from Section~1.
 \end{itemize}
 
 \subsection{Audit Statement}
@@ -43,7 +68,8 @@ joint kernels are explicit \eqref{eq:log_joint_A}--\eqref{eq:log_joint_C},
 MCMC blocks are equation-linked, VB factors are derived from \eqref{eq:vb_cavi_rule},
 and ELBO monitoring uses the block formulas in \eqref{eq:elbo_blocks},
 \eqref{eq:elbo_init_block}--\eqref{eq:elbo_entropy_W_fcast}.
-Model C uses one forecast covariance matrix per lead,
+Historical A/B evolution covariances are deterministic discount-induced known quantities,
+Model C uses one random forecast covariance matrix per lead,
 and $\lambda$ is treated throughout as a fixed known constant rather than an inferential parameter.
 Any future model extension should preserve this structure by adding
 the corresponding joint, conditional, VB, and ELBO blocks before implementation.
