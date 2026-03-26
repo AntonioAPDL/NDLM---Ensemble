@@ -1,4 +1,4 @@
-\section{Full Conditionals for Static Parameters}
+\section{Full Conditionals for Variance and Covariance Parameters}
 
 \subsection{Observation Variances: Inverse-Gamma}
 For each source $j\in\{0,\dots,J\}$, let $\mathcal{I}_j$ index all observations driven by $\sigma_j^2$,
@@ -14,33 +14,63 @@ Under $\sigma_j^2\sim\IG(a_{\sigma j},b_{\sigma j})$,
 \label{eq:cond_sigma}
 \end{align}
 
-\subsection{Evolution Covariances: Inverse-Wishart}
-For any Gaussian transition block with innovations
-$\bm e_t=\bm x_t-\bm G\bm x_{t-1}\in\R^{d_b}$ and prior
+\subsection{Historical Shared Evolution Covariances: Inverse-Wishart}
+For any historical Gaussian transition block shared across $T_b$ transitions, with innovations
+$\bm e_t=\bm x_t-\bm G_t\bm x_{t-1}\in\R^{d_b}$ and prior
 $\bm W_b\sim\IW(\nu_b,\bm S_b)$,
 \begin{align}
 \bm W_b\given\text{rest}
-\sim\IW\left(\nu_b+T_b,\;\bm S_b+\sum_{t=1}^{T_b}\bm e_t\bm e_t^\T\right),
-\label{eq:cond_W}
+\sim\IW\left(\nu_b+T_b,\;\bm S_b+\sum_{t=1}^{T_b}\bm e_t\bm e_t^\T\right).
+\label{eq:cond_W_hist}
 \end{align}
-where $T_b$ is the number of transitions included in block $b$.
+This covers the time-constant historical covariance blocks such as
+$\bm W^\theta$, $\bm W^\psi$, and $\bm W^{\delta^j}$ when they are learned rather than fixed.
 
-\subsection{Transfer Coefficient: Conjugate Gaussian Update}
-From
+\subsection{Forecast Lead-Specific Covariances: Exact Inverse-Wishart Updates}
+Choose either the reduced or augmented forecast-state specification from Section~1.
+At lead $k$, let $\bm x_{T+k}^{(f)}\in\R^{d_k^{(f)}}$ denote the active forecast state, with
+$d_k^{(f)}=p_k$ in the reduced specification and $d_k^{(f)}=p_k+1+m$ in the augmented specification.
+Define the one-step forecast innovation
 \begin{align}
-\zeta_t &= \lambda\zeta_{t-1}+\bm x_t^\T\bm\psi_t+\varepsilon_t,
-\qquad \varepsilon_t\sim\N(0,w^\zeta),
+\bm u_{T+k}^{(f)}
+:=
+\bm x_{T+k}^{(f)}-\bm M_{T+k}^{(f)}\bm x_{T+k-1}^{(f)}
+\in\R^{d_k^{(f)}}.
+\label{eq:fcast_innovation}
 \end{align}
-with prior $\lambda\sim\N(m_{\lambda0},C_{\lambda0})$,
-define
+Assume the lead-specific prior
 \begin{align}
-y_t^\lambda := \zeta_t-\bm x_t^\T\bm\psi_t.
+\bm W_{T+k}^{(f)}\sim\IW(\nu_{T+k}^{(f)},\bm S_{T+k}^{(f)}),
+\qquad k=1,\dots,K_{\max},
 \end{align}
-Then
+independently across $k$.
+Since there is exactly one Gaussian innovation associated with each lead-specific covariance,
+the full conditional kernel is
 \begin{align}
-C_\lambda^{-1} &= C_{\lambda0}^{-1}+\frac{1}{w^\zeta}\sum_{t=1}^T \zeta_{t-1}^2,\label{eq:lambda_var}\\
-m_\lambda &= C_\lambda\left(C_{\lambda0}^{-1}m_{\lambda0}+\frac{1}{w^\zeta}\sum_{t=1}^T\zeta_{t-1}y_t^\lambda\right),\label{eq:lambda_mean}\\
-\lambda\given\text{rest} &\sim \N(m_\lambda,C_\lambda),\label{eq:cond_lambda}
+p(\bm W_{T+k}^{(f)}\given\text{rest})
+&\propto
+\underbrace{|\bm W_{T+k}^{(f)}|^{-(\nu_{T+k}^{(f)}+d_k^{(f)}+1)/2}
+\exp\!\left[-\frac12\tr\!\big(\bm S_{T+k}^{(f)}(\bm W_{T+k}^{(f)})^{-1}\big)\right]}_{\text{prior}}
+\nonumber\\
+&\qquad\times
+\underbrace{|\bm W_{T+k}^{(f)}|^{-1/2}
+\exp\!\left[-\frac12(\bm u_{T+k}^{(f)})^\T(\bm W_{T+k}^{(f)})^{-1}\bm u_{T+k}^{(f)}\right]}_{\text{single transition likelihood}}
+\nonumber\\
+&\propto
+|\bm W_{T+k}^{(f)}|^{-(\nu_{T+k}^{(f)}+d_k^{(f)}+2)/2}
+\exp\!\left[-\frac12\tr\!\Big(\big(\bm S_{T+k}^{(f)}+\bm u_{T+k}^{(f)}(\bm u_{T+k}^{(f)})^\T\big)(\bm W_{T+k}^{(f)})^{-1}\Big)\right].
 \end{align}
-and for stationarity-constrained updates use
-$\lambda\given\text{rest}\propto\N(m_\lambda,C_\lambda)\ind(|\lambda|<1)$.
+Therefore, for each lead $k$,
+\begin{align}
+\bm W_{T+k}^{(f)}\given\text{rest}
+\sim\IW\left(\nu_{T+k}^{(f)}+1,\;\bm S_{T+k}^{(f)}+\bm u_{T+k}^{(f)}(\bm u_{T+k}^{(f)})^\T\right).
+\label{eq:cond_W_fcast}
+\end{align}
+This update is exact under the chosen model and does \emph{not} pool information across leads.
+For a proper inverse-Wishart prior, require $\nu_{T+k}^{(f)}>d_k^{(f)}-1$; then the posterior
+is again proper because the likelihood contributes one additional effective observation.
+
+\subsection{Fixed Transfer Rate}
+The transfer coefficient $\lambda$ is treated as known and fixed throughout the derivations.
+It enters only through the deterministic transition matrices $\tilde{\bm G}_t$ and
+$\bm M_{T+k}^{(f)}$, so there is no full conditional for $\lambda$.

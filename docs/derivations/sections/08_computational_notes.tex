@@ -11,6 +11,9 @@ $\sigma_j^2$.
 \item Use Cholesky solves, never explicit matrix inversion.
 \item Symmetrize covariance updates: replace $\bm C\leftarrow(\bm C+\bm C^\T)/2$ after updates.
 \item Floor scalar variances at a positive tolerance in implementations.
+\item In VB, form forecast pseudo-covariances from
+      $\E_q[(\bm W_{T+k}^{(f)})^{-1}]$; do not substitute $\E_q[\bm W_{T+k}^{(f)}]$
+      into the state update or ELBO.
 \end{itemize}
 
 \subsection{Reduction Checks}
@@ -19,14 +22,19 @@ The derivations must reduce to known special cases:
 \item $J=0$ and no transfer term: standard Gaussian DLM.
 \item $\bm\delta_t^j\equiv 0$: retrospective means collapse to baseline mean.
 \item No forecast window ($K=0$): Model C terms vanish.
+\item If all $\bm W_{T+k}^{(f)}$ are fixed rather than learned, the forecast block reduces
+      to a standard time-varying linear-Gaussian state-space model with known transition covariances.
 \end{itemize}
 
 \subsection{Required Unit-Level Validations}
 \begin{itemize}
 \item Gaussian likelihood normalizes to one for each source.
-\item IG and IW conditional kernels match conjugate updates.
-\item Kalman/FFBS moments match brute-force Gaussian conditioning on toy systems.
-\item Analytic derivatives for the $\lambda$ block match finite differences.
+\item IG and IW conditional kernels match conjugate updates for both historical shared blocks and
+      the lead-specific forecast covariances $\bm W_{T+k}^{(f)}$.
+\item Kalman/FFBS moments match brute-force Gaussian conditioning on toy systems with
+      time-varying forecast transition covariances.
+\item VB forecast pseudo-precisions use $\E_q[(\bm W_{T+k}^{(f)})^{-1}]$ and not
+      $\E_q[\bm W_{T+k}^{(f)}]$.
 \end{itemize}
 
 \subsection{Audit Statement}
@@ -34,6 +42,8 @@ The derivation set is intended to be implementation-complete:
 joint kernels are explicit \eqref{eq:log_joint_A}--\eqref{eq:log_joint_C},
 MCMC blocks are equation-linked, VB factors are derived from \eqref{eq:vb_cavi_rule},
 and ELBO monitoring uses the block formulas in \eqref{eq:elbo_blocks},
-\eqref{eq:elbo_init_block}--\eqref{eq:elbo_entropy_lambda}.
+\eqref{eq:elbo_init_block}--\eqref{eq:elbo_entropy_W_fcast}.
+Model C uses one forecast covariance matrix per lead,
+and $\lambda$ is treated throughout as a fixed known constant rather than an inferential parameter.
 Any future model extension should preserve this structure by adding
 the corresponding joint, conditional, VB, and ELBO blocks before implementation.

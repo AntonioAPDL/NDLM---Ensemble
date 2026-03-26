@@ -7,16 +7,22 @@ $y_t^0\in\R$ denotes the target series.
 Scope note: this document covers only Gaussian NDLM Models A--C in this repository;
 exAL augmentation and non-Gaussian likelihood extensions are intentionally excluded here.
 
-Core states and dimensions:
+Core latent components are
 \begin{align}
-\bm\theta_t &\in \R^q, & \bm\delta_t^j &\in \R^q, & \bm\psi_t &\in \R^m, & \zeta_t &\in \R.
+\bm\theta_t &\in \R^q, &
+\bm\delta_t^j &\in \R^q, &
+\bm\psi_t &\in \R^m, &
+\zeta_t &\in \R.
 \end{align}
-Stacked historical and forecast states are
+The stacked historical state is
 \begin{align}
-\bm\alpha_t &= (\bm\theta_t^\T,\zeta_t,\bm\psi_t^\T)^\T \in \R^{q+1+m}, \\
-\bm\beta_t &= (\bm\theta_t^\T,(\bm\delta_t^1)^\T,\dots,(\bm\delta_t^{J_f})^\T)^\T \in \R^{q(1+J_f)}.
+\bm\alpha_t &= (\bm\theta_t^\T,\zeta_t,\bm\psi_t^\T)^\T \in \R^{q+1+m}.
 \end{align}
-
+For the forecast stage, two fixed-dimension embeddings are useful:
+\begin{align}
+\bm\beta_t &= (\bm\theta_t^\T,(\bm\delta_t^1)^\T,\dots,(\bm\delta_t^{J_f})^\T)^\T \in \R^{q(1+J_f)}, \\
+\widetilde{\bm\beta}_t &= (\bm\beta_t^\T,\zeta_t,\bm\psi_t^\T)^\T \in \R^{q(1+J_f)+1+m}.
+\end{align}
 Observation variances satisfy $\sigma_j^2>0$ for all $j=0,\dots,J$.
 
 \subsection{Model A: Baseline Historical Gaussian NDLM}
@@ -45,6 +51,7 @@ With
 \tilde{\bm W}_t &= \BlockDiag(\bm W_t^\theta,w_t^\zeta,\bm W_t^\psi),
 \end{align}
 we have $\bm\alpha_t\given\bm\alpha_{t-1}\sim\N(\tilde{\bm G}_t\bm\alpha_{t-1},\tilde{\bm W}_t)$.
+Throughout this document, $\lambda$ is treated as a fixed known constant.
 
 \subsection{Model B: Historical Retrospective Products with Discrepancies}
 For $t=1,\dots,T$ and $j=1,\dots,J$,
@@ -57,23 +64,35 @@ z_t^j \given \bm\alpha_t,\bm\delta_t^j,\sigma_j^2
 
 \subsection{Model C: Forecast Ensemble Likelihood (Gaussian)}
 For active forecasters $j=1,\dots,J_f$, members $i=1,\dots,I_j$, and
-source-specific horizons $K_j$:
+source-specific horizons $K_j$, define
 \begin{align}
 \mathcal A_k &:= \{j: k\le K_j\}, \qquad J_k := |\mathcal A_k|, \qquad k=1,\dots,K_{\max},
 \end{align}
-with $K_{\max}:=\max_j K_j$ and state dimension $p_k:=q(1+J_k)$.
+with $K_{\max}:=\max_j K_j$ and reduced active-state dimension $p_k:=q(1+J_k)$.
+Model C is written in terms of a generic forecast state $\bm x_{T+k}^{(f)}\in\R^{d_k^{(f)}}$.
+Two coherent specifications are supported:
+\begin{enumerate}
+\item Reduced forecast state: $\bm x_{T+k}^{(f)}=\bm\beta_{T+k}^{\mathrm{act}}$ with dimension
+      $d_k^{(f)}=p_k$ (or the equivalent fixed-dimension embedding $\bm\beta_{T+k}\in\R^{q(1+J_f)}$).
+\item Augmented forecast state: $\bm x_{T+k}^{(f)}=\widetilde{\bm\beta}_{T+k}^{\mathrm{act}}$
+      with dimension $d_k^{(f)}=p_k+1+m$ (or the equivalent fixed-dimension embedding
+      $\widetilde{\bm\beta}_{T+k}\in\R^{q(1+J_f)+1+m}$), conditional on a supplied forecast-period
+      covariate path $\bm x_{T+k}^\star\in\R^m$.
+\end{enumerate}
 For each lead $k=1,\dots,K_{\max}$ and each active source $j\in\mathcal A_k$,
 \begin{align}
- y_T^{j,i}(k) \given \bm\beta_{T+k},\sigma_j^2
- &\sim \N(\bm e_{T+k,j+1}^\T\bm\beta_{T+k},\sigma_j^2), \label{eq:C_obs}\\
- \bm\beta_{T+k}\given\bm\beta_{T+k-1}
- &\sim \N(\bm M_k^\star \bm\beta_{T+k-1},\bm W_k^\star). \label{eq:C_state}
+ y_T^{j,i}(k) \given \bm x_{T+k}^{(f)},\sigma_j^2
+ &\sim \N\!\big((\bm h_{T+k,j}^{(f)})^\T\bm x_{T+k}^{(f)},\sigma_j^2\big), \label{eq:C_obs}\\
+ \bm x_{T+k}^{(f)}\given\bm x_{T+k-1}^{(f)},\bm W_{T+k}^{(f)}
+ &\sim \N\!\big(\bm M_{T+k}^{(f)}\bm x_{T+k-1}^{(f)},\bm W_{T+k}^{(f)}\big). \label{eq:C_state}
 \end{align}
-Here $(\bm M_k^\star,\bm W_k^\star)$ are the transdimensional transition blocks.
-Equivalent fixed-dimension implementations may use an embedding state
-$\tilde{\bm\beta}_{T+k}\in\R^{q(1+J_f)}$ with deterministic selection matrix
-$\bm S_k\in\{0,1\}^{p_k\times q(1+J_f)}$ such that
-$\bm\beta_{T+k}=\bm S_k\tilde{\bm\beta}_{T+k}$.
+In the reduced specification, $(\bm h_{T+k,j}^{(f)},\bm M_{T+k}^{(f)})$
+specialize to $(\bm e_{T+k,j+1},\bm M_{T+k},\bm W_{T+k}^\beta)$ from the original
+no-transfer Model C. In the augmented specification, $\bm h_{T+k,j}^{(f)}$ and
+$\bm M_{T+k}^{(f)}$ are enlarged to retain the transfer block, with $\lambda$ entering
+only through the deterministic transition mean and $\bm x_{T+k}^\star$ treated as supplied.
+Each forecast lead has its own covariance matrix $\bm W_{T+k}^{(f)}$; there is no shared
+forecast covariance pooled across leads.
 
 \subsection{Observation List Representation (Computable Form)}
 At each time $t$, index scalar observations by $n=1,\dots,n_t$:
@@ -82,21 +101,23 @@ y_{t,n} \given \bm x_t &\sim \N(\bm h_{t,n}^\T\bm x_t,r_{t,n}), \label{eq:obs_li
 \end{align}
 with $(\bm x_t,\bm h_{t,n},r_{t,n})=(\bm\alpha_t,\tilde{\bm F}_t,\sigma_0^2)$ for target,
 $(\bm\alpha_t\oplus\bm\delta_t^j,\tilde{\bm h}_{t,n},\sigma_j^2)$ for retrospective products,
-and $(\bm\beta_t,\bm e_{t,j+1},\sigma_j^2)$ for forecast members.
+and $(\bm x_t^{(f)},\bm h_{t,n}^{(f)},\sigma_j^2)$ for forecast members.
 When only one observation is present, $y_t$ denotes the single-observation case $y_{t,1}$.
 
 \subsection{Prior Block}
-Default priors (conjugate where available):
+Default priors (conjugate where available) are
 \begin{align}
 \sigma_j^2 &\sim \IG(a_{\sigma j},b_{\sigma j}),\qquad j=0,\dots,J, \label{eq:prior_sigma}\\
-\bm W_b &\sim \IW(\nu_b,\bm S_b),\qquad b\in\{\theta,\psi,\delta^1,\dots,\delta^J,\beta\}, \label{eq:prior_W}\\
-\lambda &\sim \N(m_{\lambda0},C_{\lambda0})\;\text{or}\;\N(m_{\lambda0},C_{\lambda0})\ind(|\lambda|<1). \label{eq:prior_lambda}
+\bm W_b &\sim \IW(\nu_b,\bm S_b),\qquad b\in\{\theta,\psi,\delta^1,\dots,\delta^J\}, \label{eq:prior_W}\\
+\bm W_{T+k}^{(f)} &\sim \IW(\nu_{T+k}^{(f)},\bm S_{T+k}^{(f)}),\qquad k=1,\dots,K_{\max}, \label{eq:prior_W_fcast}\\
+\lambda &\text{ is treated as a fixed known constant.} \label{eq:lambda_fixed}
 \end{align}
+The forecast covariances $\{\bm W_{T+k}^{(f)}\}_{k=1}^{K_{\max}}$ are independent across leads
+under the prior.
 Initial states are Gaussian with fixed hyperparameters:
 \begin{align}
-\bm\alpha_0\sim\N(\bm m_{\alpha0},\bm C_{\alpha0}),
-\qquad
-\bm\delta_0^j\sim\N(\bm m_{\delta0}^j,\bm C_{\delta0}^j),
-\qquad
-\bm\beta_T\sim\N(\bm m_{\beta T},\bm C_{\beta T}).
+\bm\alpha_0&\sim\N(\bm m_{\alpha0},\bm C_{\alpha0}), \\
+\bm\delta_0^j&\sim\N(\bm m_{\delta0}^j,\bm C_{\delta0}^j), \qquad j=1,\dots,J, \\
+\bm x_T^{(f)}&\sim\N(\bm m_{f0},\bm C_{f0}),
 \end{align}
+where $\bm x_T^{(f)}$ denotes the chosen reduced or augmented forecast initial state.

@@ -3,10 +3,14 @@
 \subsection{Factorization}
 Use
 \begin{align}
-q(\text{states},\sigma^2,W,\lambda)
-= q(\text{states})\prod_{j=0}^J q(\sigma_j^2)\prod_b q(\bm W_b)q(\lambda).
+q(\text{states},\sigma^2,W)
+= q(\text{states})\prod_{j=0}^J q(\sigma_j^2)
+\prod_{b\in\mathcal{B}_{\mathrm{hist}}} q(\bm W_b)
+\prod_{k=1}^{K_{\max}} q(\bm W_{T+k}^{(f)}),
 \label{eq:vb_factorization}
 \end{align}
+where $\mathcal{B}_{\mathrm{hist}}=\{\theta,\psi,\delta^1,\dots,\delta^J\}$ denotes the
+time-constant historical covariance blocks that are treated as unknown.
 Each coordinate update uses the generic CAVI rule
 \begin{align}
 \log q_i^\star(\vartheta_i)
@@ -19,10 +23,22 @@ then identifies the corresponding exponential-family kernel.
 Given current expected precisions,
 \begin{align}
 q(\text{states})\propto
-\exp\Big(\E_{-\text{states}}[\log p(\text{data},\text{states},\sigma^2,W,\lambda)]\Big),
+\exp\Big(\E_{-\text{states}}[\log p(\text{data},\text{states},\sigma^2,W)]\Big),
 \end{align}
 which remains Gaussian and is computed by a Kalman smoother on a pseudo-model with
-$\E_q[1/\sigma_j^2]$ and $\E_q[\bm W_b^{-1}]$ inserted.
+$\E_q[1/\sigma_j^2]$ inserted in the observation precisions.
+For historical shared blocks, use $\E_q[\bm W_b^{-1}]$.
+For forecast transitions, each lead $T+k$ uses its own expected precision
+\begin{align}
+\bm P_{T+k}^{(f)}:=\E_q[(\bm W_{T+k}^{(f)})^{-1}],
+\label{eq:vb_forecast_precision}
+\end{align}
+so the forecast pseudo-transition is time-varying even when the forecast state dimension is fixed.
+In covariance-form recursions, it is convenient to define the derived pseudo-covariance
+\begin{align}
+\bar{\bm W}_{T+k}^{(f)} := (\bm P_{T+k}^{(f)})^{-1},
+\end{align}
+but this quantity is \emph{not} $\E_q[\bm W_{T+k}^{(f)}]$.
 This is the direct Gaussian kernel implied by \eqref{eq:vb_cavi_rule} and
 \eqref{eq:log_joint_A}--\eqref{eq:log_joint_C}.
 
@@ -37,51 +53,79 @@ q(\sigma_j^2) &= \IG(\tilde a_{\sigma j},\tilde b_{\sigma j}), \\
 These parameters come from collecting terms in
 $\log \sigma_j^2$ and $\sigma_j^{-2}$ under \eqref{eq:vb_cavi_rule}.
 
-\subsection{Evolution Covariance Factors}
-For each block $b$,
+\subsection{Historical Shared Covariance Factors}
+For each historical shared block $b\in\mathcal{B}_{\mathrm{hist}}$,
 \begin{align}
 q(\bm W_b) &= \IW(\tilde\nu_b,\tilde{\bm S}_b), \\
 \tilde\nu_b &= \nu_b + T_b, \\
 \tilde{\bm S}_b &= \bm S_b + \sum_{t=1}^{T_b} \E_q[\bm e_t\bm e_t^\T].
-\label{eq:vb_W}
+\label{eq:vb_W_hist}
 \end{align}
 Again, \eqref{eq:vb_cavi_rule} yields an inverse-Wishart kernel by grouping
 $\log|\bm W_b|$ and $\tr(\bm W_b^{-1}\cdot)$ terms.
 
-\subsection{Transfer Coefficient Factor}
-With Gaussian prior and constant $w^\zeta$,
+\subsection{Forecast Lead-Specific Covariance Factors}
+For each lead $k=1,\dots,K_{\max}$, define the forecast innovation
 \begin{align}
-q(\lambda)=\N(\tilde m_\lambda,\tilde C_\lambda),
+\bm u_{T+k}^{(f)}:=\bm x_{T+k}^{(f)}-\bm M_{T+k}^{(f)}\bm x_{T+k-1}^{(f)}
+\in\R^{d_k^{(f)}}.
 \end{align}
-where
+The optimal factor for the lead-specific covariance is obtained from
 \begin{align}
-\tilde C_\lambda^{-1}
-&= C_{\lambda0}^{-1}+\frac{1}{w^\zeta}\sum_{t=1}^T\E_q[\zeta_{t-1}^2], \\
-\tilde m_\lambda
-&= \tilde C_\lambda\left(C_{\lambda0}^{-1}m_{\lambda0}+\frac{1}{w^\zeta}\sum_{t=1}^T\E_q[\zeta_{t-1}(\zeta_t-\bm x_t^\T\bm\psi_t)]\right).
-\label{eq:vb_lambda}
+\log q^\star(\bm W_{T+k}^{(f)})
+&=
+\E_{-\bm W_{T+k}^{(f)}}\!\left[
+\log p(\bm W_{T+k}^{(f)})
++\log p(\bm x_{T+k}^{(f)}\given\bm x_{T+k-1}^{(f)},\bm W_{T+k}^{(f)})
+\right]
++\text{const} \nonumber\\
+&=
+-\frac{\nu_{T+k}^{(f)}+d_k^{(f)}+2}{2}\log|\bm W_{T+k}^{(f)}|
+-\frac12\tr\!\left(
+\big[\bm S_{T+k}^{(f)}+\E_q[\bm u_{T+k}^{(f)}(\bm u_{T+k}^{(f)})^\T]\big]
+(\bm W_{T+k}^{(f)})^{-1}
+\right)
++\text{const}.
 \end{align}
-This is the Normal kernel from the quadratic form in $\lambda$ induced by
-\eqref{eq:vb_cavi_rule} and the Gaussian transition model.
+Hence
+\begin{align}
+q(\bm W_{T+k}^{(f)})
+&= \IW\!\left(\tilde\nu_{T+k}^{(f)},\tilde{\bm S}_{T+k}^{(f)}\right), \\
+\tilde\nu_{T+k}^{(f)}
+&= \nu_{T+k}^{(f)} + 1, \\
+\tilde{\bm S}_{T+k}^{(f)}
+&= \bm S_{T+k}^{(f)} + \E_q[\bm u_{T+k}^{(f)}(\bm u_{T+k}^{(f)})^\T].
+\label{eq:vb_W_fcast}
+\end{align}
+This update is exact under the mean-field factorization \eqref{eq:vb_factorization} and
+does not pool information across forecast leads.
 
 \subsection{Expectations Required Each Iteration}
 \begin{itemize}
-\item $\E_q[1/\sigma_j^2]$, $\E_q[\log\sigma_j^2]$,
-\item $\E_q[\bm W_b^{-1}]$, $\E_q[\log|\bm W_b|]$,
+\item $\E_q[\sigma_j^{-2}]$, $\E_q[\log\sigma_j^2]$,
+\item $\E_q[\bm W_b^{-1}]$, $\E_q[\log|\bm W_b|]$ for $b\in\mathcal{B}_{\mathrm{hist}}$,
+\item $\E_q[(\bm W_{T+k}^{(f)})^{-1}]$, $\E_q[\log|\bm W_{T+k}^{(f)}|]$ for each forecast lead $k$,
 \item $\E_q[\bm x_t]$, $\E_q[\bm x_t\bm x_t^\T]$, $\E_q[\bm x_t\bm x_{t-1}^\T]$,
-\item $\E_q[\mathrm{SSE}_j]$ and $\E_q[\bm e_t\bm e_t^\T]$.
+\item $\E_q[\mathrm{SSE}_j]$, $\E_q[\bm e_t\bm e_t^\T]$, and
+      $\E_q[\bm u_{T+k}^{(f)}(\bm u_{T+k}^{(f)})^\T]$.
 \end{itemize}
-For ragged-horizon Model C, these expectations are computed on lead-specific active
-states (or equivalent embedded fixed-dimension states) with $n_k$ observations at lead $k$.
+For ragged-horizon Model C, these expectations are computed on the lead-specific active
+state (or the algebraically equivalent embedded fixed-dimension state) with dimension $d_k^{(f)}$.
 
 Closed forms used in computation are:
 \begin{align}
 \E_q[\sigma_j^{-2}] &= \frac{\tilde a_{\sigma j}}{\tilde b_{\sigma j}},
 & \E_q[\log \sigma_j^2] &= \log \tilde b_{\sigma j}-\psi(\tilde a_{\sigma j}), \label{eq:vb_sigma_moments}\\
-\E_q[\bm W_b^{-1}] &= \tilde\nu_b\,\tilde{\bm S}_b^{-1},
-& \E_q[\log|\bm W_b|] &= \log|\tilde{\bm S}_b|-\sum_{i=1}^{d_b}\psi\!\Big(\frac{\tilde\nu_b+1-i}{2}\Big)-d_b\log 2, \label{eq:vb_iw_moments}\\
+\E_q[\bm W^{-1}] &= \tilde\nu\,\tilde{\bm S}^{-1},
+& \E_q[\log|\bm W|] &= \log|\tilde{\bm S}|-\sum_{i=1}^{d}\psi\!\Big(\frac{\tilde\nu+1-i}{2}\Big)-d\log 2, \label{eq:vb_iw_moments}\\
+\E_q[\bm W] &= \frac{\tilde{\bm S}}{\tilde\nu-d-1},
+& &\text{when }\tilde\nu>d+1, \label{eq:vb_iw_mean}\\
 \E_q[\bm x_t\bm x_t^\T] &= \bm C_t^\star+\bm m_t^\star(\bm m_t^\star)^\T,
 & \E_q[\bm x_t\bm x_{t-1}^\T] &= \bm C_{t,t-1}^\star+\bm m_t^\star(\bm m_{t-1}^\star)^\T. \label{eq:vb_state_moments}
 \end{align}
+In \eqref{eq:vb_iw_moments}--\eqref{eq:vb_iw_mean}, $(\tilde\nu,\tilde{\bm S},d)$ denotes the
+parameter triple of whichever inverse-Wishart factor is under discussion.
+Only $\E_q[\bm W^{-1}]$ and $\E_q[\log|\bm W|]$ enter the VB state update and ELBO;
+$\E_q[\bm W]$ is a posterior summary and must not be substituted into the precision terms.
 The cross-covariance $\bm C_{t,t-1}^\star$ is obtained from the backward smoother recursion
 used to compute the Gaussian state factor.

@@ -1,9 +1,10 @@
-\section{Blocked MCMC Algorithm}
+\section{Blocked Gibbs Algorithm}
 
-One Gibbs/MH sweep for the Gaussian NDLM proceeds as follows.
+One Gibbs sweep for the Gaussian NDLM proceeds as follows.
 Each step is evaluated from the computable kernels in
 \eqref{eq:log_joint_A}--\eqref{eq:log_joint_C} and the conditional families in
-\eqref{eq:cond_sigma}, \eqref{eq:cond_W}, and \eqref{eq:cond_lambda}.
+\eqref{eq:cond_sigma}, \eqref{eq:cond_W_hist}, and \eqref{eq:cond_W_fcast}.
+Because $\lambda$ is fixed, there is no separate update for the transfer rate.
 
 \begin{enumerate}[label=\textbf{Step \arabic*:},leftmargin=2.8cm]
 \item Sample state trajectories using FFBS:
@@ -11,17 +12,17 @@ Each step is evaluated from the computable kernels in
 \bm x_{0:T}^{(s)} \sim p(\bm x_{0:T}\given\text{data},\Theta^{(s-1)}),
 \end{align*}
 with block choice either joint stacked state or conditional blocks.
+If Model C is active, the forecast FFBS block is run on
+$\bm x_{T:T+K_{\max}}^{(f)}$ using the current lead-specific
+$\{\bm W_{T+k}^{(f)}\}_{k=1}^{K_{\max}}$.
 
 \item Update observation variances for each source $j$ using \eqref{eq:cond_sigma}.
 
-\item Update evolution covariance blocks $\bm W_b$ using \eqref{eq:cond_W}
-(or skip when discount factors fix these covariances).
+\item Update historical shared evolution covariance blocks using \eqref{eq:cond_W_hist}
+(or skip when those covariances are fixed).
 
-\item Update $\lambda$ via \eqref{eq:cond_lambda} (or a truncated Normal draw when $|\lambda|<1$ is enforced).
-
-\item Forecast-period smoothing/sampling (if Model C active):
-run FFBS on $\bm\beta_{T:T+K_{\max}}$ conditional on sampled static parameters,
-using lead-specific active sets $\mathcal A_k=\{j:k\le K_j\}$.
+\item Update each forecast lead-specific covariance
+$\bm W_{T+k}^{(f)}$ independently using \eqref{eq:cond_W_fcast}.
 \end{enumerate}
 
 \subsection{One-sweep pseudocode with required intermediates}
@@ -34,12 +35,11 @@ and current state draws:
 \item Draw state paths by FFBS with \eqref{eq:kf_f}--\eqref{eq:ffbs_cond},
 assimilating all observations at each time in observation-list order.
 \item Draw each $\sigma_j^2$ from \eqref{eq:cond_sigma} using the updated $\mathrm{SSE}_j$.
-\item Draw each evolution covariance block from \eqref{eq:cond_W} using innovation outer products
-$\bm e_t\bm e_t^\T$ computed from the updated state paths.
-\item Draw $\lambda$ from \eqref{eq:cond_lambda} (or truncated variant), then refresh
-the transition means that depend on $\lambda$.
-\item If Model C is active, run the forecast FFBS block for $\bm\beta_{T:T+K}$ under the
-newly sampled static parameters.
+\item Draw each historical shared covariance block from \eqref{eq:cond_W_hist}
+using innovation outer products $\bm e_t\bm e_t^\T$ computed from the updated state paths.
+\item For each forecast lead $k$, compute
+$\bm u_{T+k}^{(f)}(\bm u_{T+k}^{(f)})^\T$ from \eqref{eq:fcast_innovation}
+and draw $\bm W_{T+k}^{(f)}$ from \eqref{eq:cond_W_fcast}.
 \end{enumerate}
 Practical numerics: use Cholesky solves for Kalman/FFBS covariance systems and symmetrize sampled
 covariance matrices before reuse in the next sweep.
@@ -47,7 +47,11 @@ covariance matrices before reuse in the next sweep.
 \subsection{Diagnostics Required for Correctness}
 Track and report:
 \begin{itemize}
-\item Effective sample size and trace stability for each $\sigma_j^2$ and $\lambda$.
-\item Innovation quadratic forms $\bm e_t^\T\bm W_b^{-1}\bm e_t$.
+\item Effective sample size and trace stability for each $\sigma_j^2$ and for representative
+      scalar summaries of $\bm W_{T+k}^{(f)}$ (for example, diagonal entries or log-determinants).
+\item Innovation quadratic forms $\bm e_t^\T\bm W_b^{-1}\bm e_t$ and
+      $(\bm u_{T+k}^{(f)})^\T(\bm W_{T+k}^{(f)})^{-1}\bm u_{T+k}^{(f)}$.
 \item Posterior predictive calibration at historical holdout points.
 \end{itemize}
+Because each $\bm W_{T+k}^{(f)}$ is informed by a single transition innovation, its posterior can be
+substantially prior-dominated; this is an exact consequence of the model, not a heuristic approximation.

@@ -42,16 +42,24 @@ No inversion of large $n_t\times n_t$ matrices is required when observations are
 
 \subsection{Ragged-horizon forecast FFBS (Model C)}
 For Model C with source-specific horizons $K_j$, the lead-specific active set
-$\mathcal A_k=\{j:k\le K_j\}$ induces state dimension $p_k=q(1+|\mathcal A_k|)$.
+$\mathcal A_k=\{j:k\le K_j\}$ induces reduced state dimension $p_k=q(1+|\mathcal A_k|)$.
 Two equivalent implementations are valid:
 \begin{enumerate}
-\item True transdimensional recursion in $\R^{p_k}$ with lead-dependent
-      $(\bm G_k,\bm Q_k,\bm h_{k,n})$.
-\item Fixed-dimension embedding $\tilde{\bm\beta}_{T+k}\in\R^{q(1+J_f)}$ with
-      deterministic selection/projection matrices $\bm S_k$ such that
-      $\bm\beta_{T+k}=\bm S_k\tilde{\bm\beta}_{T+k}$ and forecast likelihoods
-      only use active coordinates.
+\item True transdimensional recursion in $\R^{d_k^{(f)}}$ with lead-dependent
+      $(\bm M_{T+k}^{(f)},\bm Q_{T+k}^{(f)},\bm h_{T+k,n}^{(f)})$, where
+      $d_k^{(f)}=p_k$ in the reduced specification and $d_k^{(f)}=p_k+1+m$
+      in the augmented specification.
+\item Fixed-dimension embedding in $\R^{q(1+J_f)}$ (reduced) or
+      $\R^{q(1+J_f)+1+m}$ (augmented) with deterministic selection/projection
+      matrices that map the embedded state to the active state used by the
+      forecast likelihood at each lead.
 \end{enumerate}
 The fixed-dimension form is algebraically equivalent to the transdimensional form
 provided inactive coordinates are projected out of both the measurement operators and
 the state innovation terms at each lead.
+For Gibbs updates, $\bm Q_{T+k}^{(f)}$ is the sampled lead-specific covariance
+$\bm W_{T+k}^{(f)}$.
+For mean-field VB, the pseudo-transition at lead $T+k$ uses the precision
+$\E_q[(\bm W_{T+k}^{(f)})^{-1}]$, or equivalently the derived pseudo-covariance
+$\bar{\bm W}_{T+k}^{(f)}:=\E_q[(\bm W_{T+k}^{(f)})^{-1}]^{-1}$ in covariance-form
+recursions; this pseudo-covariance is not $\E_q[\bm W_{T+k}^{(f)}]$.
